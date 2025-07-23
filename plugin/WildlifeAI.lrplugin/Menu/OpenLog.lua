@@ -1,8 +1,13 @@
 local LrPathUtils = import 'LrPathUtils'
 local LrShell    = import 'LrShell'
 local LrDialogs  = import 'LrDialogs'
-return function()
-  local folder = LrPathUtils.child(_PLUGIN.path, 'logs')
-  local ok = LrShell.revealInShell(folder)
-  if not ok then LrDialogs.message('WildlifeAI', 'Unable to open log folder: '..folder) end
+local LrFileUtils= import 'LrFileUtils'
+local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
+local folder = LrPathUtils.child(_PLUGIN.path, 'logs')
+if not LrFileUtils.exists(folder) then
+    LrDialogs.message('WildlifeAI', 'Log folder not found: '..folder)
+    Log.error('Log folder not found: '..folder)
+else
+    LrShell.revealInShell(folder)
+    Log.info('Opened log folder')
 end
