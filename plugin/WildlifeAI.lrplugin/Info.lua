@@ -10,14 +10,14 @@ return {
     LrInitPlugin            = 'PluginInit.lua',
     LrShutdownPlugin        = 'PluginInit.lua',
 
-    LrExportMenuItems = {
+    LrPluginMenuItems = {
         { title = 'WildlifeAI: Analyze Selected Photos', file = 'Menu/Analyze.lua', enabledWhen = 'photosSelected' },
         { title = 'WildlifeAI: Configure…',              file = 'Menu/Config.lua' },
         { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
         { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
         { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
-        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua',  enabledWhen = 'photosAvailable' },
-        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua', enabledWhen = 'catalog' },
+        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua' },
+        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua' },
     },
 
     LrLibraryMenuItems = {
@@ -26,12 +26,12 @@ return {
         { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
         { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
         { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
-        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua', enabledWhen = 'photosAvailable' },
-        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua', enabledWhen = 'catalog' },
+        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua' },
+        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua' },
     },
 
     LrMetadataProvider      = 'MetadataDefinition.lua',
     LrMetadataTagsetFactory = 'Tagset.lua',
 
-    VERSION = { major=1, minor=0, revision=5, build=0 },
+    VERSION = { major=1, minor=0, revision=6, build=0 },
 }

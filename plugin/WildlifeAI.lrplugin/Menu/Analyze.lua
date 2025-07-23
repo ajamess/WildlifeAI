@@ -27,7 +27,7 @@ local function writeOne(photo, data, prefs)
   })
 end
 
-return function()
+local function run()
   LrFunctionContext.callWithContext('WildlifeAI_Analyze', function(context)
     local catalog = LrApplication.activeCatalog()
     local photos = catalog:getTargetPhotos()
@@ -40,20 +40,20 @@ return function()
     progress:setCancelable(true)
 
     LrTasks.startAsyncTask(function()
-      Log.info('Analyze start '..#photos)
+      Log.info('Analysis start: '..#photos)
       local results = Bridge.run(photos)
       local prefs = LrPrefs.prefsForPlugin()
 
       catalog:withWriteAccessDo('WildlifeAI write', function()
         for _,photo in ipairs(photos) do
-          local pth = photo:getRawMetadata('path')
-          writeOne(photo, results[pth] or {}, prefs)
+          writeOne(photo, results[photo:getRawMetadata('path')] or {}, prefs)
         end
-      end, { timeout = 120 })
+      end, { timeout = 180 })
 
       progress:done()
-      Log.info('Analyze done')
+      Log.info('Analysis complete')
       LrDialogs.message('WildlifeAI', 'Analysis complete!')
     end)
   end)
 end
+run()
