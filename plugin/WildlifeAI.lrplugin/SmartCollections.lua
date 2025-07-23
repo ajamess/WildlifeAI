@@ -6,9 +6,5 @@ local function ensure(name, rules)
   end
   return catalog:createSmartCollection(name, rules, nil)
 end
-ensure('WildlifeAI: Quality ≥ 90', {
-  { criteria='wai_quality', operation='greaterThanOrEqualTo', value='90' }
-})
-ensure('WildlifeAI: Low Confidence ≤ 50', {
-  { criteria='wai_speciesConfidence', operation='lessThanOrEqualTo', value='50' }
-})
+ensure('WildlifeAI: Quality ≥ 90', { { criteria='wai_quality', operation='greaterThanOrEqualTo', value='90' } })
+ensure('WildlifeAI: Low Confidence ≤ 50', { { criteria='wai_speciesConfidence', operation='lessThanOrEqualTo', value='50' } })

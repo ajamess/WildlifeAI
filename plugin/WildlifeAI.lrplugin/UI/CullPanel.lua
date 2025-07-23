@@ -1,10 +1,8 @@
 local LrDialogs = import 'LrDialogs'
 local LrView    = import 'LrView'
 local LrApplication = import 'LrApplication'
-local LrPathUtils = import 'LrPathUtils'
-local Log = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
+local catalog = LrApplication.activeCatalog()
 return function()
-  local catalog = LrApplication.activeCatalog()
   local photos = catalog:getTargetPhotos()
   if #photos == 0 then photos = catalog:getAllPhotos() end
   table.sort(photos, function(a,b)
@@ -28,9 +26,8 @@ return function()
       f:static_text { title = 'C:'..(p:getPropertyForPlugin(_PLUGIN,'wai_speciesConfidence') or '0'), width_in_chars=6 },
     }
   end
-  Log.info('Opened Cull Panel for '..#photos..' photos')
   LrDialogs.presentModalDialog {
-    title = 'WildlifeAI Cull Panel (sorted by Quality/Confidence)',
+    title = 'WildlifeAI Cull Panel',
     contents = f:scrolled_view { width=700, height=500, f:column(rows) }
   }
 end
