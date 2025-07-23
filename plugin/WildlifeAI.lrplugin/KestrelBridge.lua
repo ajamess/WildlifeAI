@@ -9,29 +9,41 @@ local function isWindows() return LrPathUtils.separator == '\\' end
 local function runnerPath()
   local prefs = LrPrefs.prefsForPlugin()
   local rel = isWindows() and prefs.pythonBinaryWin or prefs.pythonBinaryMac
-  if not rel or rel == '' then rel = isWindows() and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner' end
+  if not rel or rel == '' then
+    rel = isWindows() and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner'
+  end
   local full = LrPathUtils.child(_PLUGIN.path, rel)
   Log.debug('Runner path: '..tostring(full))
   return full
 end
-local function quote(p) if isWindows() then return '"'..p..'"' else return "'"..p.."'" end end
+local function quote(path)
+  if isWindows() then return '"'..path..'"' else return "'"..path.."'" end
+end
 function M.run(photos)
-  Log.info('Bridge.run start, count='..tostring(#photos))
+  local clk = Log.enter('Bridge.run')
   local tmp = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_paths.txt')
   local f = assert(io.open(tmp, 'w'))
-  for _,p in ipairs(photos) do f:write(p:getRawMetadata('path')..'\n') end
+  for _,p in ipairs(photos) do
+    f:write(p:getRawMetadata('path')..'\n')
+  end
   f:close()
   local outDir = LrPathUtils.child(LrPathUtils.getStandardFilePath('pictures'), '.kestrel')
   LrFileUtils.createAllDirectories(outDir)
   local runner = runnerPath()
-  if not LrFileUtils.exists(runner) then Log.error('Runner missing: '..runner); return {} end
+  if not LrFileUtils.exists(runner) then
+    Log.error('Runner missing: '..runner)
+    Log.leave(clk, 'Bridge.run')
+    return {}
+  end
   local runLog = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_runner_stdout.txt')
   if LrFileUtils.exists(runLog) then LrFileUtils.delete(runLog) end
   local cmd
   if isWindows() then
-    cmd = string.format('%s --photo-list %s --output-dir %s 1> %s 2>&1', quote(runner), quote(tmp), quote(outDir), quote(runLog))
+    cmd = string.format('%s --photo-list %s --output-dir %s 1> %s 2>&1',
+      quote(runner), quote(tmp), quote(outDir), quote(runLog))
   else
-    cmd = string.format('%s --photo-list %s --output-dir %s > %s 2>&1', quote(runner), quote(tmp), quote(outDir), quote(runLog))
+    cmd = string.format('%s --photo-list %s --output-dir %s > %s 2>&1',
+      quote(runner), quote(tmp), quote(outDir), quote(runLog))
   end
   Log.info('Exec: '..cmd)
   local rc = LrTasks.execute(cmd)
@@ -60,7 +72,7 @@ function M.run(photos)
       Log.debug('No JSON for '..path)
     end
   end
-  Log.info('Bridge.run done')
+  Log.leave(clk, 'Bridge.run')
   return results
 end
 return M

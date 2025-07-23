@@ -16,6 +16,7 @@ local function bucket(v)
   return start .. '-' .. (start + 9)
 end
 function M.apply(photo, root, data)
+  Log.enter('KeywordHelper.apply')
   local catalog = LrApplication.activeCatalog()
   local spec = (data.detected_species and data.detected_species ~= '' and data.detected_species) or 'Unknown'
   local kws = {
@@ -27,6 +28,6 @@ function M.apply(photo, root, data)
     local kw = getOrCreateKeyword(catalog, parts)
     if kw then photo:addKeyword(kw) end
   end
-  Log.debug('Keywords applied to '..(photo:getFormattedMetadata('fileName') or '?'))
+  Log.leave('KeywordHelper.apply')
 end
 return M

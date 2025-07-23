@@ -4,6 +4,7 @@ local LrPrefs   = import 'LrPrefs'
 local LrPathUtils = import 'LrPathUtils'
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 return function()
+    Log.enter('PluginInfo')
     local prefs = LrPrefs.prefsForPlugin()
     local f = LrView.osFactory()
     local c = f:column {
@@ -11,7 +12,8 @@ return function()
         f:static_text { title = 'WildlifeAI Lightroom Plugin' },
         f:static_text { title = 'Logging: ' .. tostring(prefs.enableLogging) },
         f:static_text { title = 'Log file: ' .. Log.path() },
-        f:static_text { title = 'Version: 1.0.9' },
+        f:static_text { title = 'Version: 1.1.0' },
     }
     LrDialogs.presentModalDialog{ title='WildlifeAI Info', contents=c }
+    Log.leave('PluginInfo')
 end
