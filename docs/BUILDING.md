@@ -1,1 +1,1 @@
-See README for build steps.
+Run scripts/freeze_win.bat then install dist/WildlifeAI.lrplugin.zip

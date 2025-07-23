@@ -1,17 +1,11 @@
--- Minimal dkjson (encode/decode)
+-- utils/dkjson.lua (minimal)
 local json = {}
-
 local function kind(o)
   if type(o) ~= 'table' then return type(o) end
-  local i=1
-  for _ in pairs(o) do if o[i]~=nil then i=i+1 else return 'table' end end
+  local i=1; for _ in pairs(o) do if o[i]~=nil then i=i+1 else return 'table' end end
   return 'array'
 end
-
-local function esc(s)
-  return s:gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n'):gsub('\r','\\r'):gsub('\t','\\t')
-end
-
+local function esc(s) return s:gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n'):gsub('\r','\\r'):gsub('\t','\\t') end
 function json.encode(o)
   local t=type(o)
   if t=='nil' then return 'null'
@@ -26,15 +20,11 @@ function json.encode(o)
       local r={} for k,v in pairs(o) do r[#r+1]=json.encode(k)..':'..json.encode(v) end
       return '{'..table.concat(r,',')..'}'
     end
-  else
-    error('unsupported type '..t)
-  end
+  else error('bad type '..t) end
 end
-
 function json.decode(str)
   local f,err = load('return '..str, 'json', 't', {})
   if not f then error(err) end
   return f()
 end
-
 return json

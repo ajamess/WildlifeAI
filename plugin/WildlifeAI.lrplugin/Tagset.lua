@@ -1,7 +1,6 @@
-local LrMetadataTagsetFactory = import 'LrMetadataTagsetFactory'
-
+-- simple table form (no import to avoid namespace errors)
 return {
-  LrMetadataTagsetFactory.createTagset {
+  {
     id    = 'wildlifeAI_tagset',
     title = 'WildlifeAI',
     items = {
