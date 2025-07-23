@@ -5,9 +5,9 @@ local LrView            = import 'LrView'
 local LrPrefs           = import 'LrPrefs'
 local LrPathUtils       = import 'LrPathUtils'
 local Log               = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
-Log.info('Config.lua loaded')
-LrFunctionContext.callWithContext('WildlifeAI_Config', function()
-  LrTasks.startAsyncTask(function()
+LrTasks.startAsyncTask(function()
+  local clk = Log.enter('ConfigMenu')
+  LrFunctionContext.callWithContext('WildlifeAI_Config', function()
     local f = LrView.osFactory()
     local prefs = LrPrefs.prefsForPlugin()
     local c = f:column {
@@ -26,4 +26,5 @@ LrFunctionContext.callWithContext('WildlifeAI_Config', function()
     LrDialogs.presentModalDialog { title='WildlifeAI Preferences', contents=c }
     Log.info('Config dialog closed')
   end)
+  Log.leave(clk, 'ConfigMenu')
 end)

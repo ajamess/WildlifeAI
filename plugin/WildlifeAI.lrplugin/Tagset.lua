@@ -1,5 +1,6 @@
+local LrMetadataTagsetFactory = import 'LrMetadataTagsetFactory'
 return {
-  {
+  LrMetadataTagsetFactory.createTagset {
     id    = 'wildlifeAI_tagset',
     title = 'WildlifeAI',
     items = {

@@ -4,14 +4,15 @@ local LrDialogs         = import 'LrDialogs'
 local LrApplication     = import 'LrApplication'
 local LrPathUtils       = import 'LrPathUtils'
 local Log               = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
-Log.info('Stack.lua loaded')
-LrFunctionContext.callWithContext('WildlifeAI_Stack', function()
-  LrTasks.startAsyncTask(function()
+LrTasks.startAsyncTask(function()
+  local clk = Log.enter('StackMenu')
+  LrFunctionContext.callWithContext('WildlifeAI_Stack', function()
     local catalog = LrApplication.activeCatalog()
     local photos  = catalog:getTargetPhotos()
     if #photos == 0 then
       LrDialogs.message('WildlifeAI', 'No photos selected to stack.')
       Log.info('No photos selected to stack')
+      Log.leave(clk, 'StackMenu')
       return
     end
     local groups = {}
@@ -21,6 +22,7 @@ LrFunctionContext.callWithContext('WildlifeAI_Stack', function()
       table.insert(groups[sc], p)
     end
     catalog:withWriteAccessDo('WildlifeAI Stack', function()
+      Log.debug('withWriteAccessDo stack begin')
       for _,arr in pairs(groups) do
         table.sort(arr, function(a,b)
           return (tonumber(a:getPropertyForPlugin(_PLUGIN,'wai_quality') or '0') or 0) >
@@ -29,8 +31,10 @@ LrFunctionContext.callWithContext('WildlifeAI_Stack', function()
         local top = arr[1]
         for i=2,#arr do catalog:createPhotoStack(top, arr[i]) end
       end
+      Log.debug('withWriteAccessDo stack end')
     end, { timeout = 120 })
     LrDialogs.message('WildlifeAI', 'Stacking complete.')
     Log.info('Stacking complete')
   end)
+  Log.leave(clk, 'StackMenu')
 end)

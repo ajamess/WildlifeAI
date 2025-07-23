@@ -5,9 +5,9 @@ local LrView            = import 'LrView'
 local LrApplication     = import 'LrApplication'
 local LrPathUtils       = import 'LrPathUtils'
 local Log               = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
-Log.info('Cull.lua loaded')
-LrFunctionContext.callWithContext('WildlifeAI_Cull', function()
-  LrTasks.startAsyncTask(function()
+LrTasks.startAsyncTask(function()
+  local clk = Log.enter('CullMenu')
+  LrFunctionContext.callWithContext('WildlifeAI_Cull', function()
     local catalog = LrApplication.activeCatalog()
     local photos = catalog:getTargetPhotos()
     if #photos == 0 then photos = catalog:getAllPhotos() end
@@ -38,4 +38,5 @@ LrFunctionContext.callWithContext('WildlifeAI_Cull', function()
     }
     Log.info('Cull dialog closed')
   end)
+  Log.leave(clk, 'CullMenu')
 end)
