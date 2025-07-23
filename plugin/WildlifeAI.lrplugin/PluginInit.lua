@@ -15,10 +15,13 @@ if prefs.enableStacking == nil then prefs.enableStacking = true end
 if prefs.writeXmp == nil then prefs.writeXmp = false end
 if prefs.mirrorToIptc == nil then prefs.mirrorToIptc = false end
 if prefs.enableLogging == nil then prefs.enableLogging = true end
+if prefs.enableKeywords == nil then prefs.enableKeywords = false end
 
 local logDir = LrPathUtils.child(_PLUGIN.path, 'logs')
 LrFileUtils.createAllDirectories(logDir)
 
-logger:info('WildlifeAI init complete. Logging='..tostring(prefs.enableLogging))
+logger:info('WildlifeAI init. logging='..tostring(prefs.enableLogging))
 
-return { shutdown = function() logger:info('WildlifeAI shutdown') end }
+return {
+    shutdown = function() logger:info('WildlifeAI shutdown') end
+}

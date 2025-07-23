@@ -1,5 +1,5 @@
 local LrApplication = import 'LrApplication'
-local function run()
+return function()
   local catalog = LrApplication.activeCatalog()
   local function ensure(name, rules)
     for _,c in ipairs(catalog:getChildCollections()) do
@@ -14,4 +14,3 @@ local function run()
     { criteria='wai_speciesConfidence', operation='lessThanOrEqualTo', value='50' }
   })
 end
-run()

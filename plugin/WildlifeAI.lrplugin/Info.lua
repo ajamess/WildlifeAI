@@ -4,7 +4,7 @@ return {
     LrToolkitIdentifier     = 'com.wildlifeai.plugin',
     LrPluginName            = 'WildlifeAI',
 
-    LrPluginInfoUrl         = 'https://github.com/yourname/WildlifeAI',
+    LrPluginInfoUrl         = 'https://github.com/ajamess/WildlifeAI',
     LrPluginInfoProvider    = 'PluginInit.lua',
 
     LrInitPlugin            = 'PluginInit.lua',
@@ -33,5 +33,5 @@ return {
     LrMetadataProvider      = 'MetadataDefinition.lua',
     LrMetadataTagsetFactory = 'Tagset.lua',
 
-    VERSION = { major=1, minor=0, revision=6, build=0 },
+    VERSION = { major=1, minor=0, revision=7, build=0 },
 }

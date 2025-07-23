@@ -7,21 +7,19 @@ local json = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/dkjson.lua' ) )
 local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
 
 local M = {}
-
-local function isWindows() return (LrPathUtils.separator == '\\') end
-local function defaultRunner() return isWindows() and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner' end
 local function runnerPath()
   local prefs = LrPrefs.prefsForPlugin()
-  local rel = isWindows() and prefs.pythonBinaryWin or prefs.pythonBinaryMac
+  local rel = WIN_ENV and prefs.pythonBinaryWin or prefs.pythonBinaryMac
   if not rel or rel == '' then
-    rel = defaultRunner()
-    if isWindows() then prefs.pythonBinaryWin = rel else prefs.pythonBinaryMac = rel end
+    rel = WIN_ENV and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner'
   end
   local full = LrPathUtils.child(_PLUGIN.path, rel)
-  Log.debug('Runner: '..tostring(full))
+  Log.debug('Runner resolved: '..tostring(full))
   return full
 end
-
+local function quote(p)
+  if WIN_ENV then return '"'..p..'"' else return "'"..p.."'" end
+end
 function M.run(photos)
   Log.info('run() on '..#photos..' photos')
   local tmp = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_paths.txt')
@@ -32,10 +30,25 @@ function M.run(photos)
   local outDir = LrPathUtils.child(LrPathUtils.getStandardFilePath('pictures'), '.kestrel')
   LrFileUtils.createAllDirectories(outDir)
 
-  local cmd = string.format('"%s" --photo-list "%s" --output-dir "%s"', runnerPath(), tmp, outDir)
+  local runner = runnerPath()
+  if not LrFileUtils.exists(runner) then
+    Log.error('Runner missing: '..runner)
+    return {}
+  end
+  local runLog = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_runner_stdout.txt')
+  local cmd
+  if WIN_ENV then
+    cmd = string.format('%s --photo-list %s --output-dir %s 1> %s 2>&1',
+      quote(runner), quote(tmp), quote(outDir), quote(runLog))
+  else
+    cmd = string.format('%s --photo-list %s --output-dir %s > %s 2>&1',
+      quote(runner), quote(tmp), quote(outDir), quote(runLog))
+  end
   Log.info('Exec: '..cmd)
   local rc = LrTasks.execute(cmd)
   Log.info('Exit code: '..tostring(rc))
+  local out = LrFileUtils.readFile(runLog) or ''
+  if #out > 0 then Log.debug('Runner output:\n'..out) end
 
   local results = {}
   for _,p in ipairs(photos) do
@@ -51,6 +64,7 @@ function M.run(photos)
       if ok then
         data.json_path = jsonPath
         results[src] = data
+        Log.debug('Loaded JSON: '..jsonPath)
       else
         Log.error('JSON parse fail '..jsonPath)
       end
@@ -61,5 +75,4 @@ function M.run(photos)
   Log.info('run() done')
   return results
 end
-
 return M
