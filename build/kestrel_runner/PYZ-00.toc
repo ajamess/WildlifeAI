@@ -280,6 +280,26 @@
    'C:\\Users\\Adam '
    'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\ipaddress.py',
    'PYMODULE'),
+  ('json',
+   'C:\\Users\\Adam '
+   'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\__init__.py',
+   'PYMODULE'),
+  ('json.decoder',
+   'C:\\Users\\Adam '
+   'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\decoder.py',
+   'PYMODULE'),
+  ('json.encoder',
+   'C:\\Users\\Adam '
+   'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\encoder.py',
+   'PYMODULE'),
+  ('json.scanner',
+   'C:\\Users\\Adam '
+   'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\scanner.py',
+   'PYMODULE'),
+  ('kestrel_parser',
+   'C:\\Users\\Adam '
+   'Steenwyk\\Documents\\Code\\WildlifeAI\\python\\runner\\kestrel_parser.py',
+   'PYMODULE'),
   ('logging',
    'C:\\Users\\Adam '
    'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\logging\\__init__.py',

@@ -31,7 +31,7 @@ return function()
   end
 
   LrDialogs.presentModalDialog {
-    title = 'WildlifeAI Cull Panel (sorted by Quality/Confidence)',
+    title = 'WildlifeAI Cull Panel (Quality/Confidence)',
     contents = f:scrolled_view { width=700, height=500, f:column(rows) }
   }
 end

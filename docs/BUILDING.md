@@ -1,1 +1,1 @@
-Run scripts/freeze_win.bat or follow README commands.
+See README for build steps.

@@ -1,7 +1,8 @@
 local LrMetadataTagsetFactory = import 'LrMetadataTagsetFactory'
+
 return {
-  LrMetadataTagsetFactory.createTagset({
-    id = 'wildlifeAI_tagset',
+  LrMetadataTagsetFactory.createTagset {
+    id    = 'wildlifeAI_tagset',
     title = 'WildlifeAI',
     items = {
       'wai_detectedSpecies',
@@ -14,5 +15,5 @@ return {
       'wai_colorConfidence',
       'wai_jsonPath',
     }
-  })
+  }
 }
