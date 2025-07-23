@@ -1,3 +1,1 @@
-# Building
-
-Follow README for Windows/mac.
+Run scripts/freeze_win.bat or follow README commands.
