@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['python\\runner\\kestrel_runner.py'],
+    ['python\\runner\\wai_runner.py'],
     pathex=[],
     binaries=[],
     datas=[],

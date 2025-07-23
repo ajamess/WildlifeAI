@@ -296,10 +296,6 @@
    'C:\\Users\\Adam '
    'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\json\\scanner.py',
    'PYMODULE'),
-  ('kestrel_parser',
-   'C:\\Users\\Adam '
-   'Steenwyk\\Documents\\Code\\WildlifeAI\\python\\runner\\kestrel_parser.py',
-   'PYMODULE'),
   ('logging',
    'C:\\Users\\Adam '
    'Steenwyk\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\logging\\__init__.py',
