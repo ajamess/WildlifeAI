@@ -1,4 +1,6 @@
 local LrApplication = import 'LrApplication'
+local LrPrefs       = import 'LrPrefs'
+local Log  = dofile( import('LrPathUtils').child( _PLUGIN.path, 'utils/Log.lua' ) )
 
 local M = {}
 
@@ -31,6 +33,7 @@ function M.applyKeywords(photo, root, data)
       if kw then photo:addKeyword(kw) end
     end
   end)
+  Log.debug('Keywords applied for '..(photo:getFormattedMetadata('fileName') or '?'))
 end
 
 return M

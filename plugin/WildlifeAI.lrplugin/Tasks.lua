@@ -3,14 +3,13 @@ local LrTasks           = import 'LrTasks'
 local LrDialogs         = import 'LrDialogs'
 local LrProgressScope   = import 'LrProgressScope'
 local LrApplication     = import 'LrApplication'
-local LrLogger          = import 'LrLogger'
 local LrPrefs           = import 'LrPrefs'
+local LrPathUtils       = import 'LrPathUtils'
 
-local json              = require 'utils.dkjson'
+local json = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/dkjson.lua' ) )
+local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
 local Bridge            = require 'KestrelBridge'
 local KeywordHelper     = require 'KeywordHelper'
-
-local logger = LrLogger('WildlifeAI'); logger:enable('print')
 
 local function writeMetadata(photo, data)
   photo:setPropertyForPlugin(_PLUGIN, 'wai_detectedSpecies',   data.detected_species or '')
@@ -44,6 +43,7 @@ local function analyzeSelectedPhotos()
     progress:setCancelable(true)
 
     LrTasks.startAsyncTask(function()
+      Log.info('Analysis started for '..#photos..' photos')
       local results = Bridge.runKestrel(photos)
 
       catalog:withWriteAccessDo('WildlifeAI Metadata Write', function()
@@ -52,22 +52,16 @@ local function analyzeSelectedPhotos()
           local pth = photo:getRawMetadata('path')
           writeMetadata(photo, results[pth] or {})
           progress:setPortionComplete(i, #photos)
-          progress:setCaption(string.format('Wrote %d/%d', i, #photos))
+          progress:setCaption(string.format('Wrote metadata %d/%d', i, #photos))
         end
       end)
 
-      local prefs = LrPrefs.prefsForPlugin()
-      if prefs.enableStacking then
-        require('QualityStack').stackByScene(photos)
-      end
-
       progress:done()
+      Log.info('Analysis complete')
       LrDialogs.message('WildlifeAI', 'Analysis complete!')
     end)
   end)
 end
 
-local cmd = _PLUGIN.command
-if cmd == 'Analyze Selected Photos with WildlifeAI' or cmd == 'Re-run Analysis on Missing Results' then
-  analyzeSelectedPhotos()
-end
+-- Execute directly when invoked
+analyzeSelectedPhotos()

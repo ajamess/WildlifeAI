@@ -19,6 +19,7 @@ return function()
     f:checkbox { title='Enable stacking by scene count after analysis', value=LrView.bind('enableStacking') },
     f:checkbox { title='Write XMP sidecars after metadata update', value=LrView.bind('writeXmp') },
     f:checkbox { title='Mirror numeric fields to IPTC Job Identifier (sortable)', value=LrView.bind('mirrorToIptc') },
+    f:checkbox { title='Enable verbose logging (writes to logs/wildlifeai.log)', value=LrView.bind('enableLogging') },
   }
 
   LrDialogs.presentModalDialog { title='WildlifeAI Preferences', contents=c }

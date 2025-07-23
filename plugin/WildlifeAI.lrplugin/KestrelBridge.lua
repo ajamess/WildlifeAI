@@ -1,43 +1,47 @@
 local LrTasks      = import 'LrTasks'
 local LrFileUtils  = import 'LrFileUtils'
 local LrPathUtils  = import 'LrPathUtils'
-local LrLogger     = import 'LrLogger'
 local LrPrefs      = import 'LrPrefs'
-local json         = require 'utils.dkjson'
 
-local logger = LrLogger('WildlifeAI'); logger:enable('print')
+local json = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/dkjson.lua' ) )
+local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
 
 local M = {}
 
 local function isWindows()
-  -- Lightroom defines WIN_ENV on Windows; fallback check:
   return (WIN_ENV == true) or (LrPathUtils.separator == '\\')
 end
 
 local function getRunnerPath()
   local prefs = LrPrefs.prefsForPlugin()
+  local path
   if isWindows() then
-    return LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryWin)
+    path = LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryWin)
   else
-    return LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryMac)
+    path = LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryMac)
   end
+  Log.debug('Runner path: '..tostring(path))
+  return path
 end
 
 function M.runKestrel(photos)
+  Log.info('runKestrel start with '..#photos..' photos')
   local tmp = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_paths.txt')
-  local f = io.open(tmp, 'w')
+  local f = assert(io.open(tmp, 'w'))
   for _,p in ipairs(photos) do
     f:write(p:getRawMetadata('path') .. '\n')
   end
   f:close()
+  Log.debug('Wrote photo list: '..tmp)
 
   local outDir = LrPathUtils.child(LrPathUtils.getStandardFilePath('pictures'), '.kestrel')
   LrFileUtils.createAllDirectories(outDir)
+  Log.debug('Output dir: '..outDir)
 
   local cmd = string.format('"%s" --photo-list "%s" --output-dir "%s"', getRunnerPath(), tmp, outDir)
-  logger:info('Executing: '..cmd)
+  Log.info('Executing: '..cmd)
   local rc = LrTasks.execute(cmd)
-  logger:info('Runner exit: '..tostring(rc))
+  Log.info('Runner exit code: '..tostring(rc))
 
   local results = {}
   for _,p in ipairs(photos) do
@@ -53,11 +57,15 @@ function M.runKestrel(photos)
       if ok then
         data.json_path = jsonPath
         results[pth] = data
+        Log.debug('Parsed JSON for '..pth)
       else
-        logger:error('JSON parse failed '..jsonPath)
+        Log.error('JSON parse failed: '..jsonPath)
       end
+    else
+      Log.debug('JSON not found for '..pth)
     end
   end
+  Log.info('runKestrel done')
   return results
 end
 
