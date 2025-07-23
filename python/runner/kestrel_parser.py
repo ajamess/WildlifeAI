@@ -1,5 +1,5 @@
 from pathlib import Path
-def to_lightroom_json(raw, src_path: str, output_dir: str):
+def to_lightroom_json(raw, src_path, output_dir):
     return {
         'source_path': src_path,
         'json_path': str(Path(src_path).with_suffix('.json')),
