@@ -8,23 +8,20 @@ local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
 
 local M = {}
 
-local function isWindows() return (WIN_ENV == true) or (LrPathUtils.separator == '\\') end
-local function defaultRunnerPath() return isWindows() and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner' end
-
-local function getRunnerPath()
+local function isWindows() return (LrPathUtils.separator == '\\') end
+local function defaultRunner() return isWindows() and 'bin/win/kestrel_runner.exe' or 'bin/mac/kestrel_runner' end
+local function runnerPath()
   local prefs = LrPrefs.prefsForPlugin()
   local rel = isWindows() and prefs.pythonBinaryWin or prefs.pythonBinaryMac
   if not rel or rel == '' then
-    rel = defaultRunnerPath()
+    rel = defaultRunner()
     if isWindows() then prefs.pythonBinaryWin = rel else prefs.pythonBinaryMac = rel end
   end
-  local full = LrPathUtils.child(_PLUGIN.path, rel)
-  Log.debug('Runner path: '..tostring(full))
-  return full
+  return LrPathUtils.child(_PLUGIN.path, rel)
 end
 
-function M.runKestrel(photos)
-  Log.info('runKestrel start '..#photos)
+function M.run(photos)
+  Log.info('run start '..#photos)
   local tmp = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_paths.txt')
   local f = assert(io.open(tmp, 'w'))
   for _,p in ipairs(photos) do f:write(p:getRawMetadata('path')..'\n') end
@@ -33,10 +30,10 @@ function M.runKestrel(photos)
   local outDir = LrPathUtils.child(LrPathUtils.getStandardFilePath('pictures'), '.kestrel')
   LrFileUtils.createAllDirectories(outDir)
 
-  local cmd = string.format('"%s" --photo-list "%s" --output-dir "%s"', getRunnerPath(), tmp, outDir)
-  Log.info('Exec: '..cmd)
+  local cmd = string.format('"%s" --photo-list "%s" --output-dir "%s"', runnerPath(), tmp, outDir)
+  Log.info('exec '..cmd)
   local rc = LrTasks.execute(cmd)
-  Log.info('Runner rc '..tostring(rc))
+  Log.info('rc '..tostring(rc))
 
   local results = {}
   for _,p in ipairs(photos) do
@@ -53,13 +50,11 @@ function M.runKestrel(photos)
         data.json_path = jsonPath
         results[pth] = data
       else
-        Log.error('JSON parse fail '..jsonPath)
+        Log.error('json parse fail '..jsonPath)
       end
-    else
-      Log.debug('No JSON for '..pth)
     end
   end
-  Log.info('runKestrel done')
+  Log.info('run done')
   return results
 end
 

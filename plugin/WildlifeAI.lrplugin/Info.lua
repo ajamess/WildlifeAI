@@ -11,21 +11,27 @@ return {
     LrShutdownPlugin        = 'PluginInit.lua',
 
     LrExportMenuItems = {
-        { title = 'Analyze Selected Photos with WildlifeAI', file = 'Tasks.lua', enabledWhen = 'photosSelected' }
+        { title = 'WildlifeAI: Analyze Selected Photos', file = 'Menu/Analyze.lua', enabledWhen = 'photosSelected' },
+        { title = 'WildlifeAI: Configure…',              file = 'Menu/Config.lua' },
+        { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
+        { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
+        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
+        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua',  enabledWhen = 'photosAvailable' },
+        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua', enabledWhen = 'catalog' },
     },
 
-    LrPluginMenuItems = {
-        { title = 'Configure WildlifeAI…', file = 'UI/ConfigDialog.lua' },
-        { title = 'Toggle Logging On/Off', file = 'UI/ToggleLogging.lua' },
-        { title = 'Open Log Folder', file = 'UI/OpenLogFolder.lua' },
-        { title = 'Re-run Analysis on Missing Results', file = 'Tasks.lua', enabledWhen = 'photosAvailable' },
-        { title = 'Stack by Scene Count', file = 'QualityStack.lua', enabledWhen = 'photosSelected' },
-        { title = 'Cull Panel…', file = 'UI/CullPanel.lua', enabledWhen = 'photosAvailable' },
-        { title = 'Generate Smart Collections', file = 'SmartCollections.lua', enabledWhen = 'catalog' },
+    LrLibraryMenuItems = {
+        { title = 'WildlifeAI: Analyze Selected Photos', file = 'Menu/Analyze.lua', enabledWhen = 'photosSelected' },
+        { title = 'WildlifeAI: Configure…',              file = 'Menu/Config.lua' },
+        { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
+        { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
+        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
+        { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua', enabledWhen = 'photosAvailable' },
+        { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua', enabledWhen = 'catalog' },
     },
 
     LrMetadataProvider      = 'MetadataDefinition.lua',
     LrMetadataTagsetFactory = 'Tagset.lua',
 
-    VERSION = { major=1, minor=0, revision=4, build=0 },
+    VERSION = { major=1, minor=0, revision=5, build=0 },
 }

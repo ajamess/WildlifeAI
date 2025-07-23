@@ -1,6 +1,6 @@
 local LrApplication = import 'LrApplication'
-local LrPathUtils   = import 'LrPathUtils'
-local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
+local LrPathUtils = import 'LrPathUtils'
+local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 
 local M = {}
 
@@ -19,9 +19,9 @@ local function bucket(v)
   return start .. '-' .. (start + 9)
 end
 
-function M.applyKeywords_noWrite(photo, root, data)
+function M.apply(photo, root, data)
   local catalog = LrApplication.activeCatalog()
-  local spec = data.detected_species ~= '' and data.detected_species or 'Unknown'
+  local spec = (data.detected_species ~= '' and data.detected_species) or 'Unknown'
   local kws = {
     {root, 'Species', spec},
     {root, 'Quality', bucket(data.quality)},
@@ -31,7 +31,7 @@ function M.applyKeywords_noWrite(photo, root, data)
     local kw = getOrCreateKeyword(catalog, parts)
     if kw then photo:addKeyword(kw) end
   end
-  Log.debug('Keywords applied to '..(photo:getFormattedMetadata('fileName') or '?'))
+  Log.debug('Keywords set for '..(photo:getFormattedMetadata('fileName') or '?'))
 end
 
 return M
