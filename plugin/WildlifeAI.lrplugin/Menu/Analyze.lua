@@ -5,11 +5,10 @@ local LrProgressScope   = import 'LrProgressScope'
 local LrApplication     = import 'LrApplication'
 local LrPrefs           = import 'LrPrefs'
 local LrPathUtils       = import 'LrPathUtils'
-
 local Log    = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local Bridge = dofile( LrPathUtils.child(_PLUGIN.path, 'KestrelBridge.lua') )
 local KW     = dofile( LrPathUtils.child(_PLUGIN.path, 'KeywordHelper.lua') )
-
+Log.info('Analyze.lua loaded')
 local function writeOne(photo, data, prefs)
   photo:setPropertyForPlugin(_PLUGIN, 'wai_detectedSpecies',   data.detected_species or '')
   photo:setPropertyForPlugin(_PLUGIN, 'wai_speciesConfidence', tostring(data.species_confidence or 0))
@@ -28,33 +27,28 @@ local function writeOne(photo, data, prefs)
     })
   end
 end
-
-return function()
-  LrFunctionContext.callWithContext('WildlifeAI_Analyze', function(context)
-    LrTasks.startAsyncTask(function()
-      local catalog = LrApplication.activeCatalog()
-      local photos = catalog:getTargetPhotos()
-      if #photos == 0 then
-        LrDialogs.message('WildlifeAI', 'No photos selected.')
-        return
+LrFunctionContext.callWithContext('WildlifeAI_Analyze', function(context)
+  LrTasks.startAsyncTask(function()
+    Log.info('Analyze task started')
+    local catalog = LrApplication.activeCatalog()
+    local photos = catalog:getTargetPhotos()
+    if #photos == 0 then
+      LrDialogs.message('WildlifeAI', 'No photos selected.')
+      Log.info('No photos selected for analysis')
+      return
+    end
+    local progress = LrProgressScope{ title = 'WildlifeAI Analysis', functionContext = context }
+    progress:setCancelable(true)
+    Log.info('Calling Bridge.run with '..#photos..' photos')
+    local results = Bridge.run(photos)
+    local prefs = LrPrefs.prefsForPlugin()
+    catalog:withWriteAccessDo('WildlifeAI write', function()
+      for _,photo in ipairs(photos) do
+        writeOne(photo, results[photo:getRawMetadata('path')] or {}, prefs)
       end
-
-      local progress = LrProgressScope{ title = 'WildlifeAI Analysis', functionContext = context }
-      progress:setCancelable(true)
-
-      Log.info('Analysis start: '..#photos)
-      local results = Bridge.run(photos)
-      local prefs = LrPrefs.prefsForPlugin()
-
-      catalog:withWriteAccessDo('WildlifeAI write', function()
-        for _,photo in ipairs(photos) do
-          writeOne(photo, results[photo:getRawMetadata('path')] or {}, prefs)
-        end
-      end, { timeout = 300 })
-
-      progress:done()
-      Log.info('Analysis complete')
-      LrDialogs.message('WildlifeAI', 'Analysis complete!')
-    end)
+    end, { timeout = 300 })
+    progress:done()
+    Log.info('Analysis complete')
+    LrDialogs.message('WildlifeAI', 'Analysis complete!')
   end)
-end
+end)

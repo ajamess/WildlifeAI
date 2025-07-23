@@ -10,5 +10,5 @@ return {
     { id='wai_colorConfidence',     title='WildlifeAI: Color Confidence',    dataType='string', searchable=true, browsable=true },
     { id='wai_jsonPath',            title='WildlifeAI: JSON Result Path',    dataType='url',    searchable=false, browsable=false },
   },
-  schemaVersion = 14,
+  schemaVersion = 15,
 }
