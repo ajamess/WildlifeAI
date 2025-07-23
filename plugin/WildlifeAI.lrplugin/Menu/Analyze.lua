@@ -47,10 +47,10 @@ return function()
       local prefs = LrPrefs.prefsForPlugin()
 
       catalog:withWriteAccessDo('WildlifeAI write', function()
-        for i,photo in ipairs(photos) do
+        for _,photo in ipairs(photos) do
           writeOne(photo, results[photo:getRawMetadata('path')] or {}, prefs)
         end
-      end, { timeout = 240 })
+      end, { timeout = 300 })
 
       progress:done()
       Log.info('Analysis complete')

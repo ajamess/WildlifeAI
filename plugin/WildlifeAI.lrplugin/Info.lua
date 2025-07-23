@@ -15,8 +15,8 @@ return {
         { title = 'WildlifeAI: Configure…',              file = 'Menu/Config.lua' },
         { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
         { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
-        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
         { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua' },
+        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
         { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua' },
     },
 
@@ -25,13 +25,13 @@ return {
         { title = 'WildlifeAI: Configure…',              file = 'Menu/Config.lua' },
         { title = 'WildlifeAI: Toggle Logging',          file = 'Menu/ToggleLogging.lua' },
         { title = 'WildlifeAI: Open Log Folder',         file = 'Menu/OpenLog.lua' },
-        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
         { title = 'WildlifeAI: Cull Panel…',             file = 'Menu/Cull.lua' },
+        { title = 'WildlifeAI: Stack by Scene Count',    file = 'Menu/Stack.lua', enabledWhen = 'photosSelected' },
         { title = 'WildlifeAI: Generate Smart Collections', file = 'Menu/SmartCollections.lua' },
     },
 
     LrMetadataProvider      = 'MetadataDefinition.lua',
     LrMetadataTagsetFactory = 'Tagset.lua',
 
-    VERSION = { major=1, minor=0, revision=7, build=0 },
+    VERSION = { major=1, minor=0, revision=8, build=0 },
 }
