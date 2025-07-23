@@ -1,0 +1,4 @@
+filename,species,species_confidence,quality,export_path,crop_path,rating,scene_count,feature_similarity,feature_confidence,color_similarity,color_confidence
+DSC09981.ARW,Cliff Swallow,0.653280616,0.044591721,Z:\Photos\2025\July\20\.kestrel\export\DSC09981_export.jpg,Z:\Photos\2025\July\20\.kestrel\crop\DSC09981_crop.jpg,1,473,0.423333333,1,0,0
+DSC09990.ARW,Cliff Swallow,0.939201415,0.174327955,Z:\Photos\2025\July\20\.kestrel\export\DSC09990_export.jpg,Z:\Photos\2025\July\20\.kestrel\crop\DSC09990_crop.jpg,2,474,0.316666667,1,0,0
+DSC09995.ARW,Leach's Storm-Petrel,0.194199577,0.040182672,Z:\Photos\2025\July\20\.kestrel\export\DSC09995_export.jpg,Z:\Photos\2025\July\20\.kestrel\crop\DSC09995_crop.jpg,1,474,0.706666667,1,0,0
