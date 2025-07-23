@@ -2,47 +2,36 @@ local LrTasks      = import 'LrTasks'
 local LrFileUtils  = import 'LrFileUtils'
 local LrPathUtils  = import 'LrPathUtils'
 local LrPrefs      = import 'LrPrefs'
-
 local json = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/dkjson.lua' ) )
 local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
-
 local M = {}
-
-local function isWindows()
-  return (WIN_ENV == true) or (LrPathUtils.separator == '\\')
-end
-
+local function isWindows() return (WIN_ENV == true) or (LrPathUtils.separator == '\\') end
+local function defaultRunnerPath() if isWindows() then return 'bin/win/kestrel_runner.exe' else return 'bin/mac/kestrel_runner' end end
 local function getRunnerPath()
   local prefs = LrPrefs.prefsForPlugin()
-  local path
-  if isWindows() then
-    path = LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryWin)
-  else
-    path = LrPathUtils.child(_PLUGIN.path, prefs.pythonBinaryMac)
+  local rel = isWindows() and prefs.pythonBinaryWin or prefs.pythonBinaryMac
+  if not rel or rel == '' then
+    rel = defaultRunnerPath()
+    if isWindows() then prefs.pythonBinaryWin = rel else prefs.pythonBinaryMac = rel end
   end
-  Log.debug('Runner path: '..tostring(path))
-  return path
+  local full = LrPathUtils.child(_PLUGIN.path, rel)
+  Log.debug('Runner path resolved to: '..tostring(full))
+  return full
 end
-
 function M.runKestrel(photos)
-  Log.info('runKestrel start with '..#photos..' photos')
+  Log.info('runKestrel: '..tostring(#photos)..' photos')
   local tmp = LrPathUtils.child(LrPathUtils.getStandardFilePath('temp'), 'wai_paths.txt')
   local f = assert(io.open(tmp, 'w'))
-  for _,p in ipairs(photos) do
-    f:write(p:getRawMetadata('path') .. '\n')
-  end
+  for _,p in ipairs(photos) do f:write(p:getRawMetadata('path') .. '\n') end
   f:close()
-  Log.debug('Wrote photo list: '..tmp)
-
+  Log.debug('Photo list file: '..tmp)
   local outDir = LrPathUtils.child(LrPathUtils.getStandardFilePath('pictures'), '.kestrel')
   LrFileUtils.createAllDirectories(outDir)
   Log.debug('Output dir: '..outDir)
-
   local cmd = string.format('"%s" --photo-list "%s" --output-dir "%s"', getRunnerPath(), tmp, outDir)
   Log.info('Executing: '..cmd)
   local rc = LrTasks.execute(cmd)
-  Log.info('Runner exit code: '..tostring(rc))
-
+  Log.info('Runner exit: '..tostring(rc))
   local results = {}
   for _,p in ipairs(photos) do
     local pth = p:getRawMetadata('path')
@@ -57,7 +46,7 @@ function M.runKestrel(photos)
       if ok then
         data.json_path = jsonPath
         results[pth] = data
-        Log.debug('Parsed JSON for '..pth)
+        Log.debug('Parsed JSON: '..jsonPath)
       else
         Log.error('JSON parse failed: '..jsonPath)
       end
@@ -65,8 +54,7 @@ function M.runKestrel(photos)
       Log.debug('JSON not found for '..pth)
     end
   end
-  Log.info('runKestrel done')
+  Log.info('runKestrel finished')
   return results
 end
-
 return M

@@ -1,4 +1,3 @@
--- utils/dkjson.lua (minimal)
 local json = {}
 local function kind(o)
   if type(o) ~= 'table' then return type(o) end
