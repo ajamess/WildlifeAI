@@ -12,7 +12,7 @@ return function()
         f:static_text { title = 'WildlifeAI Lightroom Plugin' },
         f:static_text { title = 'Logging: ' .. tostring(prefs.enableLogging) },
         f:static_text { title = 'Log file: ' .. Log.path() },
-        f:static_text { title = 'Version: 1.1.0' },
+        f:static_text { title = 'Version: 1.1.1' },
     }
     LrDialogs.presentModalDialog{ title='WildlifeAI Info', contents=c }
     Log.leave('PluginInfo')

@@ -26,5 +26,5 @@ LrTasks.startAsyncTask(function()
     LrDialogs.presentModalDialog { title='WildlifeAI Preferences', contents=c }
     Log.info('Config dialog closed')
   end)
-  Log.leave(clk, 'ConfigMenu')
+  Log.leave(clk,'ConfigMenu')
 end)
