@@ -2,33 +2,32 @@ local LrApplication = import 'LrApplication'
 
 local M = {}
 
-local function getOrCreateKeyword(catalog, pathParts)
+local function getOrCreateKeyword(catalog, parts)
   local parent = nil
-  for _,name in ipairs(pathParts) do
+  for _, name in ipairs(parts) do
     local kw = catalog:createKeyword(name, {}, true, parent, true)
     parent = kw
   end
   return parent
 end
 
-local function bucket(value)
-  local start = math.floor((value or 0)/10)*10
+local function bucket(v)
+  local n = tonumber(v) or 0
+  local start = math.floor(n/10) * 10
   return start .. '-' .. (start + 9)
 end
 
 function M.applyKeywords(photo, root, data)
   local catalog = LrApplication.activeCatalog()
-
-  local spec = data.detected_species or 'Unknown'
-  local specKw = {root, 'Species', spec}
-
-  local qBucket = {root, 'Quality', bucket(data.quality or 0)}
-  local cBucket = {root, 'Confidence', bucket(data.species_confidence or 0)}
-
-  local kws = { specKw, qBucket, cBucket }
+  local spec = (data.detected_species ~= '' and data.detected_species) or 'Unknown'
+  local kws = {
+    { root, 'Species', spec },
+    { root, 'Quality', bucket(data.quality) },
+    { root, 'Confidence', bucket(data.species_confidence) },
+  }
   catalog:withWriteAccessDo('WildlifeAI Keywords', function()
-    for _,pathParts in ipairs(kws) do
-      local kw = getOrCreateKeyword(catalog, pathParts)
+    for _, parts in ipairs(kws) do
+      local kw = getOrCreateKeyword(catalog, parts)
       if kw then photo:addKeyword(kw) end
     end
   end)

@@ -1,1 +1,1 @@
-Place kestrel_runner binary here
+place kestrel_runner here

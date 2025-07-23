@@ -1,40 +1,13 @@
--- dkjson.lua (condensed)  https://github.com/LuaDist/dkjson
-local dkjson = {}
-local json = dkjson
-local function kind_of(obj)
-  if type(obj) ~= 'table' then return type(obj) end
-  local i = 1
-  for _ in pairs(obj) do
-    if obj[i] ~= nil then i = i + 1 else return 'table' end
-  end
-  if i == 1 then return 'table' else return 'array' end
-end
-local function escape_str(s)
-  s = s:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n'):gsub('\r', '\\r'):gsub('\t', '\\t')
-  return s
-end
-function json.encode(obj)
-  local t = type(obj)
-  if t == 'nil' then return 'null'
-  elseif t == 'number' or t == 'boolean' then return tostring(obj)
-  elseif t == 'string' then return '"'..escape_str(obj)..'"'
-  elseif t == 'table' then
-    local k = kind_of(obj)
-    if k == 'array' then
-      local res = {}
-      for _,v in ipairs(obj) do res[#res+1] = json.encode(v) end
-      return '['..table.concat(res, ',')..']'
-    else
-      local res = {}
-      for key,v in pairs(obj) do res[#res+1] = json.encode(key)..':'..json.encode(v) end
-      return '{'..table.concat(res, ',')..'}'
-    end
-  else error('unsupported type '..t) end
-end
--- Simple decoder using load() for brevity (LR sandbox allows). For production, use full dkjson.
-function json.decode(str)
-  local f, err = load('return '..str, 'json', 't', {})
-  if not f then error(err) end
-  return f()
-end
+local json={}
+local function kind(o) if type(o)~='table' then return type(o) end local i=1 for _ in pairs(o) do if o[i]~=nil then i=i+1 else return 'table' end end return 'array' end
+local function esc(s) return s:gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n'):gsub('\r','\\r'):gsub('\t','\\t') end
+function json.encode(o) local t=type(o)
+ if t=='nil' then return 'null'
+ elseif t=='number' or t=='boolean' then return tostring(o)
+ elseif t=='string' then return '"'..esc(o)..'"'
+ elseif t=='table' then local k=kind(o)
+  if k=='array' then local r={} for _,v in ipairs(o) do r[#r+1]=json.encode(v) end return '['..table.concat(r,',')..']'
+  else local r={} for k,v in pairs(o) do r[#r+1]=json.encode(k)..':'..json.encode(v) end return '{'..table.concat(r,',')..'}' end
+ else error('bad type '..t) end end
+function json.decode(s) local f,err=load('return '..s,'json','t',{}) if not f then error(err) end return f() end
 return json
