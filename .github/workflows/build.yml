@@ -1,0 +1,23 @@
+name: Build Lightroom Plugin
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r python/runner/requirements.txt pyinstaller
+          pyinstaller python/runner/wai_runner.py --onefile --name kestrel_runner
+          mkdir plugin/WildlifeAI.lrplugin/bin/win
+          copy dist\kestrel_runner.exe plugin/WildlifeAI.lrplugin\bin\win\
+          python scripts/package_plugin.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WildlifeAI-win
+          path: dist/WildlifeAI.lrplugin.zip

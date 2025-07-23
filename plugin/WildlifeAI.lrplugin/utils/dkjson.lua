@@ -1,3 +1,4 @@
+-- dkjson.lua (tiny)
 local json = {}
 local function kind(o)
   if type(o) ~= 'table' then return type(o) end
@@ -20,10 +21,5 @@ function json.encode(o)
       return '{'..table.concat(r,',')..'}'
     end
   else error('bad type '..t) end
-end
-function json.decode(str)
-  local f,err = load('return '..str, 'json', 't', {})
-  if not f then error(err) end
-  return f()
 end
 return json
