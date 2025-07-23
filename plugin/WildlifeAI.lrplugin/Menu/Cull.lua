@@ -3,6 +3,7 @@ local LrTasks           = import 'LrTasks'
 local LrDialogs         = import 'LrDialogs'
 local LrView            = import 'LrView'
 local LrApplication     = import 'LrApplication'
+
 return function()
   LrFunctionContext.callWithContext('WildlifeAI_Cull', function()
     LrTasks.startAsyncTask(function()
@@ -32,8 +33,9 @@ return function()
           f:static_text { title = 'C:'..(p:getPropertyForPlugin(_PLUGIN,'wai_speciesConfidence') or '0'), width_in_chars=6 },
         }
       end
-      LrDialogs.presentModalDialog{
-        title='WildlifeAI Cull Panel',
+
+      LrDialogs.presentModalDialog {
+        title = 'WildlifeAI Cull Panel',
         contents = f:scrolled_view { width=700, height=500, f:column(rows) }
       }
     end)

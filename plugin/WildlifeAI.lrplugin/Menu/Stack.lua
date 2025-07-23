@@ -2,6 +2,7 @@ local LrFunctionContext = import 'LrFunctionContext'
 local LrTasks           = import 'LrTasks'
 local LrDialogs         = import 'LrDialogs'
 local LrApplication     = import 'LrApplication'
+
 return function()
   LrFunctionContext.callWithContext('WildlifeAI_Stack', function()
     LrTasks.startAsyncTask(function()
@@ -26,7 +27,7 @@ return function()
           local top = arr[1]
           for i=2,#arr do catalog:createPhotoStack(top, arr[i]) end
         end
-      end, { timeout = 90 })
+      end, { timeout = 120 })
       LrDialogs.message('WildlifeAI', 'Stacking complete.')
     end)
   end)
