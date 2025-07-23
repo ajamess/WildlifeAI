@@ -1,3 +1,1 @@
-# Architecture
-
-See canvas for details.
+Describes Lua layer, Python runner, metadata flow.

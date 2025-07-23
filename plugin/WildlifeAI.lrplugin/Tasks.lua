@@ -6,7 +6,7 @@ local LrApplication     = import 'LrApplication'
 local LrLogger          = import 'LrLogger'
 local LrPrefs           = import 'LrPrefs'
 
-local json              = require 'utils/dkjson'
+local json              = require 'utils.dkjson'
 local Bridge            = require 'KestrelBridge'
 local KeywordHelper     = require 'KeywordHelper'
 
@@ -25,16 +25,16 @@ local function writeMetadata(photo, data)
 
   local prefs = LrPrefs.prefsForPlugin()
   KeywordHelper.applyKeywords(photo, prefs.keywordRoot or 'WildlifeAI', {
-    detected_species    = data.detected_species or '',
-    quality             = tonumber(data.quality or 0) or 0,
-    species_confidence  = tonumber(data.species_confidence or 0) or 0,
+    detected_species = data.detected_species or '',
+    quality = tonumber(data.quality or 0) or 0,
+    species_confidence = tonumber(data.species_confidence or 0) or 0,
   })
 end
 
 local function analyzeSelectedPhotos()
   LrFunctionContext.callWithContext('WildlifeAI_Analyze', function(context)
     local catalog = LrApplication.activeCatalog()
-    local photos  = catalog:getTargetPhotos()
+    local photos = catalog:getTargetPhotos()
     if #photos == 0 then
       LrDialogs.message('WildlifeAI', 'No photos selected.')
       return
@@ -45,12 +45,12 @@ local function analyzeSelectedPhotos()
 
     LrTasks.startAsyncTask(function()
       local results = Bridge.runKestrel(photos)
+
       catalog:withWriteAccessDo('WildlifeAI Metadata Write', function()
         for i,photo in ipairs(photos) do
           if progress:isCanceled() then break end
-          local pth  = photo:getRawMetadata('path')
-          local data = results[pth] or {}
-          writeMetadata(photo, data)
+          local pth = photo:getRawMetadata('path')
+          writeMetadata(photo, results[pth] or {})
           progress:setPortionComplete(i, #photos)
           progress:setCaption(string.format('Wrote %d/%d', i, #photos))
         end

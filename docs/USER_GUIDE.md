@@ -1,3 +1,1 @@
-# User Guide
-
-How to install and run the plugin in Lightroom.
+Install plugin, analyze photos, view fields, use smart collections.

@@ -3,10 +3,11 @@ import argparse, json, os
 from pathlib import Path
 from kestrel_parser import to_lightroom_json
 
+# TODO: replace with real ProjectKestrel integration
 def fake_analyze(path):
     import random
     return {
-        'species': 'Unknown',
+        'detected_species': 'Unknown',
         'species_confidence': random.randint(60,99),
         'quality': random.randint(50,100),
         'rating': random.randint(0,100),
