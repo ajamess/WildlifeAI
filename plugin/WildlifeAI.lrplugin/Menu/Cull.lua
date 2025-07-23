@@ -38,5 +38,5 @@ LrTasks.startAsyncTask(function()
     }
     Log.info('Cull dialog closed')
   end)
-  Log.leave(clk, 'CullMenu')
+  Log.leave(clk,'CullMenu')
 end)
