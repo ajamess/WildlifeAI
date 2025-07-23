@@ -1,5 +1,5 @@
-local LrLogger = import 'LrLogger'
-local LrPrefs  = import 'LrPrefs'
+local LrLogger    = import 'LrLogger'
+local LrPrefs     = import 'LrPrefs'
 local LrFileUtils = import 'LrFileUtils'
 local LrPathUtils = import 'LrPathUtils'
 
@@ -12,13 +12,13 @@ prefs.pythonBinaryWin = prefs.pythonBinaryWin or 'bin/win/kestrel_runner.exe'
 prefs.pythonBinaryMac = prefs.pythonBinaryMac or 'bin/mac/kestrel_runner'
 prefs.keywordRoot     = prefs.keywordRoot     or 'WildlifeAI'
 if prefs.enableStacking == nil then prefs.enableStacking = true end
-prefs.writeXmp        = prefs.writeXmp        or false
-prefs.mirrorToIptc    = prefs.mirrorToIptc    or false
-prefs.enableLogging   = prefs.enableLogging   or false
+if prefs.writeXmp == nil then prefs.writeXmp = false end
+if prefs.mirrorToIptc == nil then prefs.mirrorToIptc = false end
+if prefs.enableLogging == nil then prefs.enableLogging = true end
 
 local logDir = LrPathUtils.child(_PLUGIN.path, 'logs')
 LrFileUtils.createAllDirectories(logDir)
 
-logger:info('WildlifeAI init done')
+logger:info('WildlifeAI init complete. Logging='..tostring(prefs.enableLogging))
 
 return { shutdown = function() logger:info('WildlifeAI shutdown') end }

@@ -31,7 +31,7 @@ function M.apply(photo, root, data)
     local kw = getOrCreateKeyword(catalog, parts)
     if kw then photo:addKeyword(kw) end
   end
-  Log.debug('Keywords set for '..(photo:getFormattedMetadata('fileName') or '?'))
+  Log.debug('Keywords applied to '..(photo:getFormattedMetadata('fileName') or '?'))
 end
 
 return M

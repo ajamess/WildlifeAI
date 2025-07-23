@@ -1,7 +1,7 @@
 local LrDialogs = import 'LrDialogs'
 local LrView    = import 'LrView'
 local LrPrefs   = import 'LrPrefs'
-return function()
+local function run()
   local f = LrView.osFactory()
   local prefs = LrPrefs.prefsForPlugin()
   local c = f:column {
@@ -18,3 +18,4 @@ return function()
   }
   LrDialogs.presentModalDialog { title='Configure WildlifeAI', contents=c }
 end
+run()

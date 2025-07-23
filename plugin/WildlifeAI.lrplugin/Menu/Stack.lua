@@ -1,6 +1,6 @@
 local LrApplication = import 'LrApplication'
 local LrDialogs     = import 'LrDialogs'
-return function()
+local function run()
   local catalog = LrApplication.activeCatalog()
   local photos  = catalog:getTargetPhotos()
   if #photos == 0 then
@@ -25,3 +25,4 @@ return function()
   end, { timeout = 60 })
   LrDialogs.message('WildlifeAI', 'Stacking complete.')
 end
+run()

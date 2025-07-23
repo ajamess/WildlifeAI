@@ -1,7 +1,7 @@
 local LrDialogs = import 'LrDialogs'
 local LrView    = import 'LrView'
 local LrApplication = import 'LrApplication'
-return function()
+local function run()
   local catalog = LrApplication.activeCatalog()
   local photos = catalog:getTargetPhotos()
   if #photos == 0 then photos = catalog:getAllPhotos() end
@@ -31,3 +31,4 @@ return function()
     contents = f:scrolled_view { width=700, height=500, f:column(rows) }
   }
 end
+run()

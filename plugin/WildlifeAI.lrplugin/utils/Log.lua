@@ -13,8 +13,8 @@ end
 local function write(level, msg)
   local prefs = LrPrefs.prefsForPlugin()
   if not prefs.enableLogging then return end
-  local f = io.open(ensure(), 'a')
-  if f then
+  local ok, f = pcall(io.open, ensure(), 'a')
+  if ok and f then
     f:write(os.date('%Y-%m-%d %H:%M:%S') .. ' ['..level..'] ' .. tostring(msg) .. '\n')
     f:close()
   end
