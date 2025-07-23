@@ -1,12 +1,9 @@
 import shutil
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-PLUGIN=ROOT/'plugin'/'WildlifeAI.lrplugin'
-DIST=ROOT/'dist'
-DIST.mkdir(exist_ok=True)
-zip_base=DIST/'WildlifeAI.lrplugin'
-if zip_base.exists():
-    if zip_base.is_dir(): shutil.rmtree(zip_base)
-    else: zip_base.unlink()
-shutil.make_archive(str(zip_base),'zip',PLUGIN)
-print('Created',zip_base.with_suffix('.zip'))
+root = Path(__file__).resolve().parents[1]
+plugin = root/'plugin'/'WildlifeAI.lrplugin'
+dist = root/'dist'; dist.mkdir(exist_ok=True)
+zipbase = dist/'WildlifeAI.lrplugin'
+if zipbase.with_suffix('.zip').exists(): zipbase.with_suffix('.zip').unlink()
+shutil.make_archive(str(zipbase), 'zip', plugin)
+print('Created', zipbase.with_suffix('.zip'))

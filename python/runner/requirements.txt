@@ -1,5 +1,8 @@
-tensorflow==2.16.1
-numpy
+onnxruntime-gpu
+onnxruntime
+rawpy
 pillow
+numpy
+torch
+torchvision
 opencv-python
-click
