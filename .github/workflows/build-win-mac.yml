@@ -1,0 +1,70 @@
+name: Build Windows & macOS Plugin
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/runner/requirements.txt pyinstaller
+      - name: Build runner
+        run: |
+          pyinstaller python/runner/kestrel_runner.py --onefile --name kestrel_runner
+          mkdir plugin/WildlifeAI.lrplugin/bin/win
+          copy dist\kestrel_runner.exe plugin\WildlifeAI.lrplugin\bin\win\
+      - name: Package plugin
+        run: python scripts/package_plugin.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WildlifeAI-win
+          path: dist/WildlifeAI.lrplugin.zip
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/runner/requirements.txt pyinstaller
+      - name: Build runner
+        run: |
+          pyinstaller python/runner/kestrel_runner.py --onefile --name kestrel_runner
+          mkdir -p plugin/WildlifeAI.lrplugin/bin/mac
+          cp dist/kestrel_runner plugin/WildlifeAI.lrplugin/bin/mac/
+      - name: Package plugin
+        run: python scripts/package_plugin.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WildlifeAI-mac
+          path: dist/WildlifeAI.lrplugin.zip
+
+  release:
+    needs: [build-win, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: WildlifeAI-*
+          path: artifacts
+      - name: Collect
+        run: |
+          mkdir dist
+          cp artifacts/WildlifeAI-win/WildlifeAI.lrplugin.zip dist/WildlifeAI-win.lrplugin.zip
+          cp artifacts/WildlifeAI-mac/WildlifeAI.lrplugin.zip dist/WildlifeAI-mac.lrplugin.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
