@@ -65,4 +65,6 @@ function M.run(photos)
   Log.leave(clk,'Bridge.run')
   return results
 end
+-- Compatibility alias used by older parts of the plug in
+M.runKestrel = M.run
 return M
