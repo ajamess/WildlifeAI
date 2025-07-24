@@ -15,6 +15,22 @@ local function bucket(v)
   local start = math.floor(n/10)*10
   return start .. '-' .. (start + 9)
 end
+
+function M.applyKeywords_noWrite(photo, root, data)
+  Log.enter('KeywordHelper.applyKeywords_noWrite')
+  local catalog = LrApplication.activeCatalog()
+  local spec = (data.detected_species and data.detected_species ~= '' and data.detected_species) or 'Unknown'
+  local kws = {
+    {root, 'Species', spec},
+    {root, 'Quality', bucket(data.quality)},
+    {root, 'Confidence', bucket(data.species_confidence)},
+  }
+  for _,parts in ipairs(kws) do
+    local kw = getOrCreateKeyword(catalog, parts)
+    if kw then photo:addKeyword(kw) end
+  end
+  Log.leave('KeywordHelper.applyKeywords_noWrite')
+end
 function M.apply(photo, root, data)
   Log.enter('KeywordHelper.apply')
   local catalog = LrApplication.activeCatalog()
