@@ -77,6 +77,21 @@ scripts\freeze_win.bat
 ```
 Both scripts create a virtual environment, install `python/runner/requirements.txt`, freeze the runner with PyInstaller and output `dist/WildlifeAI.lrplugin.zip`.
 
+## Testing
+
+Integration tests ensure the runner produces the expected JSON and preview
+images. Each folder inside `tests/` contains an `original` directory of input
+files plus accompanying `crop`, `export` and `kestrel_database.csv` entries.
+
+Run the full test harness with:
+
+```bash
+pytest -s
+```
+
+The harness executes the runner for every file and compares each output value to
+the database, printing the per‑image results to the console.
+
 ---
 
 ## Troubleshooting
