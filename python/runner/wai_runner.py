@@ -37,7 +37,7 @@ def load_models():
     labels = []
 
     if (MODEL_DIR / "labels.txt").exists():
-        with open(MODEL_DIR / "labels.txt") as f:
+        with open(MODEL_DIR / "labels.txt", encoding="utf-8-sig") as f:
             labels = [l.strip() for l in f if l.strip()]
 
     if ort and (MODEL_DIR / "model.onnx").exists():
