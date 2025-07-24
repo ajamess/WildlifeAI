@@ -119,13 +119,15 @@ def main():
     ap.add_argument("--output-dir", required=True)
     ap.add_argument("--log-file", default=None)
     ap.add_argument("--self-test", action="store_true")
+    ap.add_argument("--no-crop", action="store_true", help="disable crop generation")
+    ap.add_argument("--verbose", action="store_true", help="enable verbose logging")
     args = ap.parse_args()
 
     if args.log_file:
         os.makedirs(Path(args.log_file).parent, exist_ok=True)
         setup_log(args.log_file)
     else:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     logging.info("Runner start")
 
@@ -203,6 +205,17 @@ def main():
         }
         out.write_text(json.dumps(data))
         logging.debug("Wrote %s", out)
+        if not args.no_crop:
+            img = Image.open(p)
+            w,h = img.size
+            side = min(w,h)
+            left = (w - side)//2
+            top = (h - side)//2
+            box = (left, top, left+side, top+side)
+            crop = img.crop(box)
+            crop_path = Path(args.output_dir) / (Path(p).stem + "_crop.jpg")
+            crop.save(crop_path)
+            logging.debug("Cropped %s", crop_path)
 
     logging.info("Runner done")
     return 0

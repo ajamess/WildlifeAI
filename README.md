@@ -55,7 +55,7 @@
 
 ### Logging and Preferences
 
-- Open **Library ▸ Plug‑in Extras ▸ WildlifeAI ▸ Configure…** to set runner paths and toggle logging.
+- Open **Library ▸ Plug‑in Extras ▸ WildlifeAI ▸ Configure…** to set runner paths and change options like keyword root, stacking, sidecar writing and crop generation.
 - Use **WildlifeAI ▸ Toggle Logging** to quickly enable or disable detailed logging.
 - **WildlifeAI ▸ Open Log Folder** opens the directory containing `wildlifeai.log` for troubleshooting.
 
