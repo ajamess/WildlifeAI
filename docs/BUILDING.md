@@ -30,6 +30,20 @@ is zipped to `dist\WildlifeAI.lrplugin.zip`.
 The steps mirror the Windows script and produce
 `dist/WildlifeAI.lrplugin.zip` containing the macOS binary.
 
+## Automatic Builds with GitHub Actions
+
+If your repository is hosted on GitHub you can enable continuous builds using
+the provided workflow in `.github/workflows/build.yml`. It runs on every push to
+the `main` branch and packages the plug‑in automatically.
+
+1. Push your changes to GitHub.
+2. Open the repository's **Actions** tab and select the latest **Build Lightroom
+   Plugin** run.
+3. Download `WildlifeAI.lrplugin.zip` from the **Artifacts** section.
+
+Each run will produce a fresh archive in `dist/` that can be installed in
+Lightroom.
+
 ## Manual Packaging
 
 To rebuild the archive after making manual changes to the plug-in files run:
