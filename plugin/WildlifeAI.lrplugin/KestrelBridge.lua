@@ -6,7 +6,9 @@ local LrDialogs = import 'LrDialogs'
 local json = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/dkjson.lua') )
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local M = {}
-local function isWin() return LrPathUtils.separator == '\\' end
+local function isWin()
+  return WIN_ENV or LrPathUtils.separator == '\\'
+end
 local function quote(p) if isWin() then return '"'..p..'"' else return "'"..p.."'" end end
 local function chooseRunner()
   local prefs = LrPrefs.prefsForPlugin()
@@ -30,12 +32,15 @@ function M.run(photos)
     Log.leave(clk,'Bridge.run'); return {}
   end
   local runnerLog = LrPathUtils.child(outDir, 'kestrel_runner.log')
+  local prefs = LrPrefs.prefsForPlugin()
   local cmd
   if isWin() then
     cmd = string.format('cmd /c "%s --photo-list %s --output-dir %s --log-file %s"', quote(runner), quote(tmp), quote(outDir), quote(runnerLog))
   else
     cmd = string.format('%s --photo-list %s --output-dir %s --log-file %s', quote(runner), quote(tmp), quote(outDir), quote(runnerLog))
   end
+  if prefs.generateCrops == false then cmd = cmd .. ' --no-crop' end
+  if prefs.enableLogging then cmd = cmd .. ' --verbose' end
   Log.info('Exec: '..cmd)
   local rc = LrTasks.execute(cmd)
   Log.info('Runner exit: '..tostring(rc))
