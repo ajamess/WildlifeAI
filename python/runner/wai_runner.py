@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -8,7 +9,10 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-import cv2
+try:
+    import cv2
+except Exception:  # pragma: no cover - optional at runtime
+    cv2 = None
 try:
     import onnxruntime as ort
 except Exception:  # pragma: no cover - optional at runtime
@@ -33,7 +37,7 @@ def load_models():
     labels = []
 
     if (MODEL_DIR / "labels.txt").exists():
-        with open(MODEL_DIR / "labels.txt") as f:
+        with open(MODEL_DIR / "labels.txt", encoding="utf-8-sig") as f:
             labels = [l.strip() for l in f if l.strip()]
 
     if ort and (MODEL_DIR / "model.onnx").exists():
@@ -64,7 +68,10 @@ def load_image(path):
     if img is None:
         img = np.array(Image.open(path).convert("RGB"))
 
-    img = cv2.resize(img, (224, 224))
+    if cv2:
+        img = cv2.resize(img, (224, 224))
+    else:
+        img = np.array(Image.fromarray(img).resize((224, 224)))
     img = img.astype("float32") / 255.0
     return img
 
@@ -125,10 +132,45 @@ def main():
     if args.self_test:
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        results = []
+
+        if args.photo_list.endswith(".csv"):
+            with open(args.photo_list, newline="") as cf:
+                reader = csv.DictReader(cf)
+                for row in reader:
+                    dest = out_dir / f"{Path(row['filename']).stem}.json"
+                    data = {
+                        "detected_species": row.get("species", ""),
+                        "species_confidence": int(float(row.get("species_confidence", 0)) * 100),
+                        "quality": int(float(row.get("quality", 0)) * 100),
+                        "rating": int(row.get("rating", 0)),
+                        "scene_count": int(row.get("scene_count", 0)),
+                        "feature_similarity": int(float(row.get("feature_similarity", 0)) * 100),
+                        "feature_confidence": int(float(row.get("feature_confidence", 0)) * 100),
+                        "color_similarity": int(float(row.get("color_similarity", 0)) * 100),
+                        "color_confidence": int(float(row.get("color_confidence", 0)) * 100),
+                        "json_path": str(dest),
+                    }
+                    dest.write_text(json.dumps(data))
+                    results.append(data)
+        else:
+            out = out_dir / "selftest.json"
+            data = {
+                "detected_species": "TestBird",
+                "species_confidence": 99,
+                "quality": 88,
+                "rating": 4,
+                "scene_count": 1,
+                "feature_similarity": 80,
+                "feature_confidence": 90,
+                "color_similarity": 70,
+                "color_confidence": 65,
+                "json_path": str(out),
+            }
+            results.append(data)
+
         out = out_dir / "selftest.json"
-        out.write_text(json.dumps({"detected_species":"TestBird","species_confidence":99,"quality":88,"rating":4,
-                                   "scene_count":1,"feature_similarity":80,"feature_confidence":90,
-                                   "color_similarity":70,"color_confidence":65,"json_path":str(out)}))
+        out.write_text(json.dumps(results, indent=2))
         logging.info("Self-test JSON written %s", out)
         return 0
 
