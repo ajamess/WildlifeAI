@@ -66,6 +66,7 @@
 ## Building From Source
 
 Prebuilt plug‑ins are produced by the GitHub workflow, but you can build locally with Python 3.11.
+Each push to the `main` branch triggers the workflow and uploads `WildlifeAI.lrplugin.zip` as an artifact—see `docs/BUILDING.md` for download steps.
 
 ### Windows
 ```cmd
