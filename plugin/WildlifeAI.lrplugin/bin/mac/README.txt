@@ -1,1 +1,1 @@
-Place kestrel_runner here
+Place kestrel_runner (built from python/runner/wai_runner.py) here
