@@ -6,6 +6,7 @@ local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local Bridge = dofile( LrPathUtils.child(_PLUGIN.path, 'KestrelBridge.lua') )
+local KW = dofile( LrPathUtils.child(_PLUGIN.path, 'KeywordHelper.lua') )
 LrTasks.startAsyncTask(function()
   local clk = Log.enter('AnalyzeMenu')
   LrFunctionContext.callWithContext('WAI_Analyze', function(context)
@@ -15,6 +16,7 @@ LrTasks.startAsyncTask(function()
     local progress = LrProgressScope{ title='WildlifeAI Analysis', functionContext=context }
     progress:setCancelable(true)
     local results = Bridge.run(photos)
+    local prefs = LrPrefs.prefsForPlugin()
     catalog:withWriteAccessDo('WAI write', function()
       for i,photo in ipairs(photos) do
         local d = results[photo:getRawMetadata('path')] or {}
@@ -29,9 +31,22 @@ LrTasks.startAsyncTask(function()
         set('wai_colorSimilarity', d.color_similarity)
         set('wai_colorConfidence', d.color_confidence)
         set('wai_jsonPath', d.json_path)
+        KW.applyKeywords_noWrite(photo, prefs.keywordRoot or 'WildlifeAI', {
+          detected_species = d.detected_species,
+          quality = tonumber(d.quality or 0),
+          species_confidence = tonumber(d.species_confidence or 0),
+        })
+        if prefs.mirrorJobId then
+          local jid = string.format('Q:%s R:%s C:%s', d.quality or '', d.rating or '', d.scene_count or '')
+          photo:setRawMetadata('jobIdentifier', jid)
+        end
+        if prefs.writeXMP then photo:saveMetadata() end
         progress:setPortionComplete(i,#photos)
       end
     end,{timeout=300})
+    if prefs.enableStacking then
+      catalog:withWriteAccessDo('WAI Stack', function() require('QualityStack') end,{timeout=120})
+    end
     progress:done()
     LrDialogs.message('WildlifeAI','Analysis complete')
     Log.leave(clk,'AnalyzeMenu')
