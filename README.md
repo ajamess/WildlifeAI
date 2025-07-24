@@ -89,6 +89,10 @@ Run the full test harness with:
 ```bash
 pytest -s
 ```
+Ensure all Python dependencies are installed before running the tests. The build
+scripts create a `venv` directory containing these requirements—activate it
+using `venv\Scripts\activate` on Windows or `source venv/bin/activate` on
+macOS/Linux, then run `pytest`.
 
 The harness executes the runner for every file and compares each output value to
 the database, printing the per‑image results to the console.
