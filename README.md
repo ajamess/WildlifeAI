@@ -1,6 +1,7 @@
 # WildlifeAI Lightroom Plugin
 
 **WildlifeAI** brings machine‑learning assisted culling to Adobe Lightroom Classic. It detects bird species, estimates image quality and stores the results as searchable metadata. The plug‑in runs entirely offline and requires no external installs beyond the bundled runner binary.
+The new `wai_runner` backend executes analysis tasks asynchronously so multiple batches can be queued without blocking Lightroom.
 
 > **Compatibility**
 > - **Lightroom Classic** 6.0 or later
@@ -14,8 +15,8 @@
 2. Extract the archive somewhere permanent.
 3. In Lightroom Classic open **File ▸ Plug‑in Manager…** and click **Add…**.
 4. Browse to the `WildlifeAI.lrplugin` folder and confirm.
-5. (Windows) copy `kestrel_runner.exe` into `WildlifeAI.lrplugin/bin/win/`.
-   (macOS) copy `kestrel_runner` into `WildlifeAI.lrplugin/bin/mac/`.
+5. (Windows) copy `wai_runner.exe` into `WildlifeAI.lrplugin/bin/win/`.
+   (macOS) copy `wai_runner` into `WildlifeAI.lrplugin/bin/mac/`.
 6. The plug‑in now appears in the manager with no red errors.
 
 *Placeholder for screenshot of Lightroom Plug‑in Manager with WildlifeAI added*

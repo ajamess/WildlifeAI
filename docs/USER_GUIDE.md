@@ -18,15 +18,15 @@ Choose **Library > Plug‑in Extras > WildlifeAI: Configure…** to set the path
 the Python runner executables. Logging can also be turned on or off here. The
 default paths are:
 
-- Windows: `bin/win/kestrel_runner.exe`
-- macOS: `bin/mac/kestrel_runner`
+ - Windows: `bin/win/wai_runner.exe`
+ - macOS: `bin/mac/wai_runner`
 
 ## Running Analysis
 
 1. Select photos in the Library module.
 2. Choose **Library > Plug‑in Extras > WildlifeAI: Analyze Selected Photos**.
 3. Progress is shown while the runner processes the images. JSON files are
-   written alongside the originals when possible or in `Pictures/.kestrel`.
+   written alongside the originals when possible or in `Pictures/.wai`.
 4. After completion new metadata fields are populated. Enable the *WildlifeAI*
    tagset from the Metadata panel to view them.
 5. Smart collections named *WildlifeAI: Quality ≥ 90* and *WildlifeAI: Low

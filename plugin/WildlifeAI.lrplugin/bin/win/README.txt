@@ -1,1 +1,1 @@
-Place kestrel_runner.exe (built from python/runner/wai_runner.py) here
+Place wai_runner.exe (built from python/runner/wai_runner.py) here

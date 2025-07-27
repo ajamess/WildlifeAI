@@ -8,7 +8,7 @@ local LrPathUtils       = import 'LrPathUtils'
 
 local json = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/dkjson.lua' ) )
 local Log  = dofile( LrPathUtils.child( _PLUGIN.path, 'utils/Log.lua' ) )
-local Bridge = dofile( LrPathUtils.child( _PLUGIN.path, 'KestrelBridge.lua' ) )
+local Bridge = dofile( LrPathUtils.child( _PLUGIN.path, 'RunnerBridge.lua' ) )
 local KW = dofile( LrPathUtils.child( _PLUGIN.path, 'KeywordHelper.lua' ) )
 
 local function writeMetadata(photo, data)
@@ -37,7 +37,7 @@ local function analyzeSelectedPhotos()
 
     LrTasks.startAsyncTask(function()
       Log.info('Analysis start for '..#photos)
-      local results = Bridge.runKestrel(photos)
+      local results = Bridge.run(photos)
 
       catalog:withWriteAccessDo('WildlifeAI Metadata+Keywords', function()
         for i,photo in ipairs(photos) do

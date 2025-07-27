@@ -18,7 +18,7 @@ scripts\freeze_win.bat
 
 The script creates `venv/`, installs dependencies from
 `python\runner\requirements.txt`, runs PyInstaller and copies the resulting
-`kestrel_runner.exe` to `plugin\WildlifeAI.lrplugin\bin\win`. Finally the plug-in
+`wai_runner.exe` to `plugin\WildlifeAI.lrplugin\bin\win`. Finally the plug-in
 is zipped to `dist\WildlifeAI.lrplugin.zip`.
 
 ## macOS

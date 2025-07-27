@@ -16,7 +16,7 @@ WildlifeAI is composed of two main parts:
 2. The plug-in creates a temporary list of file paths and calls the platform
    specific runner binary located in `bin/win/` or `bin/mac/`.
 3. The runner reads each image, runs inference and writes a JSON file either next
-   to the source image or inside `Pictures/.kestrel` when that is not possible.
+   to the source image or inside `Pictures/.wai` when that is not possible.
 4. After the runner exits, the plug-in parses the JSON results and writes the
    values into Lightroom custom metadata fields.
 5. Optional keywords and smart collections can then be used for filtering and
