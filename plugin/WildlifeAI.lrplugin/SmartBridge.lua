@@ -1372,6 +1372,15 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
   
   if #photosToProcess == 0 then
     Log.info('All photos already processed, no runner execution needed')
+    
+    -- Apply metadata to existing results if metadata callback is provided
+    if metadataCallback and next(results) then
+      Log.info('Applying metadata to existing results via callback')
+      LrTasks.startAsyncTask(function()
+        metadataCallback(results, photosMap)
+      end)
+    end
+    
     Log.leave(clk, 'SmartBridge.run')
     return results
   end
@@ -1644,69 +1653,83 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
       Log.info('BACKGROUND: Monitoring thread completed after ' .. loopCount .. ' iterations')
     end)
     
-    -- MAIN THREAD: Handle progress updates and apply metadata as results become available
-    Log.info('MAIN THREAD: Starting real-time metadata processing loop')
+    -- MAIN THREAD: Handle progress updates and save results (NO METADATA OPERATIONS)
+    Log.info('MAIN THREAD: Starting real-time results saving loop (NO metadata operations)')
     local mainLoopCount = 0
     local lastQueueSize = 0
+    local processedCount = 0
     
     while not monitoringComplete and (os.time() - startTime) < maxWaitTime do
       mainLoopCount = mainLoopCount + 1
       
-      -- Process any new results that appeared in the queue
-      if #newResultsQueue > lastQueueSize then
-        -- Process new items in queue
-        for i = lastQueueSize + 1, #newResultsQueue do
+      -- Process any new results that appeared in the queue - ONLY save results
+      local currentQueueSize = #newResultsQueue
+      if currentQueueSize > lastQueueSize then
+        Log.info('MAIN THREAD: Processing queue items ' .. (lastQueueSize + 1) .. ' to ' .. currentQueueSize)
+        
+        for i = lastQueueSize + 1, currentQueueSize do
           local item = newResultsQueue[i]
-          if not processedPhotos[item.filename] then
-            Log.info('MAIN THREAD: Processing metadata for: ' .. item.filename)
+          if item and not processedPhotos[item.filename] then
+            Log.info('MAIN THREAD: Saving results for: ' .. item.filename .. ' (NO metadata operations)')
             
-            -- Save results to photo directory
+            -- ONLY save results to photo directory - NO metadata operations
             local saveSuccess = savePhotoResults(item.result.photo_path, item.result)
             if saveSuccess then
               Log.info('MAIN THREAD: Results saved for: ' .. item.filename)
             end
             
-            -- Apply plugin properties (should be safe in main thread)
-            local pluginSuccess, pluginErr = pcall(function()
-              applySimpleNonYieldingMetadata(item.photo, item.result, prefs)
-            end)
-            
-            if pluginSuccess then
-              Log.info('MAIN THREAD: Plugin properties applied for: ' .. item.filename)
-            else
-              Log.error('MAIN THREAD: Plugin properties failed for ' .. item.filename .. ': ' .. tostring(pluginErr))
-            end
-            
-            -- Apply visual metadata with catalog write access
-            local catalog = item.photo.catalog
-            local visualSuccess, visualErr = pcall(function()
-              catalog:withWriteAccessDo('WAI main thread metadata: ' .. item.filename, function()
-                applyVisualMetadataOnly(item.photo, item.result, catalog, prefs)
-              end, {timeout=30})
-            end)
-            
-            if visualSuccess then
-              Log.info('MAIN THREAD: Visual metadata applied for: ' .. item.filename)
-            else
-              Log.error('MAIN THREAD: Visual metadata failed for ' .. item.filename .. ': ' .. tostring(visualErr))
-            end
-            
             processedPhotos[item.filename] = true
+            processedCount = processedCount + 1
             
             -- Update progress callback
             if progressCallback then
-              progressCallback(#processedPhotos, #photosToProcess, 'Processed: ' .. item.filename)
+              progressCallback(processedCount, #photosToProcess, 'Processed: ' .. item.filename)
             end
+          elseif item then
+            Log.info('MAIN THREAD: Item already processed, skipping: ' .. item.filename)
+          else
+            Log.error('MAIN THREAD: Invalid item at queue position ' .. i)
           end
         end
-        lastQueueSize = #newResultsQueue
+        lastQueueSize = currentQueueSize
+        Log.info('MAIN THREAD: Processed ' .. processedCount .. ' photos so far (total queue: ' .. currentQueueSize .. ')')
       end
       
       -- Brief sleep to avoid busy waiting
       LrTasks.sleep(0.1)
     end
     
-    Log.info('MAIN THREAD: Completed after ' .. mainLoopCount .. ' iterations, processed ' .. #processedPhotos .. ' photos')
+    -- Process any remaining items in queue after monitoring completes
+    if monitoringComplete then
+      local finalQueueSize = #newResultsQueue
+      if finalQueueSize > lastQueueSize then
+        Log.info('MAIN THREAD: Processing final queue items ' .. (lastQueueSize + 1) .. ' to ' .. finalQueueSize)
+        
+        for i = lastQueueSize + 1, finalQueueSize do
+          local item = newResultsQueue[i]
+          if item and not processedPhotos[item.filename] then
+            Log.info('MAIN THREAD: Saving final results for: ' .. item.filename .. ' (NO metadata operations)')
+            
+            -- ONLY save results to photo directory - NO metadata operations
+            local saveSuccess = savePhotoResults(item.result.photo_path, item.result)
+            if saveSuccess then
+              Log.info('MAIN THREAD: Final results saved for: ' .. item.filename)
+            end
+            
+            processedPhotos[item.filename] = true
+            processedCount = processedCount + 1
+            
+            -- Update progress callback
+            if progressCallback then
+              progressCallback(processedCount, #photosToProcess, 'Processed: ' .. item.filename)
+            end
+          end
+        end
+        Log.info('MAIN THREAD: Final processing completed, total processed: ' .. processedCount)
+      end
+    end
+    
+    Log.info('MAIN THREAD: Completed after ' .. mainLoopCount .. ' iterations, saved ' .. processedCount .. ' photo results')
     
     -- Verify completion
     if monitoringComplete then
@@ -1874,10 +1897,9 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
     end
   end
   
-  -- DISABLED: Batch keyword processing to avoid yielding issues
-  -- All visual metadata is now applied in real-time via async tasks
-  -- Keywords functionality is preserved but disabled until further testing
-  Log.info('Batch keyword processing disabled - all metadata applied in real-time')
+  -- Metadata callback is now handled directly in Analyze.lua after SmartBridge.run() completes
+  -- This ensures proper yielding context without any interference from the monitoring threads
+  Log.info('SmartBridge.run() completed - metadata will be applied by caller in proper context')
   
   -- Cleanup temp files AFTER ensuring execution is complete
   if tmp then

@@ -12,14 +12,8 @@
 
 ---
 
-## 🎬 **See WildlifeAI in Action**
-
-*Watch as WildlifeAI instantly transforms your bird photography workflow:*
 ![Banner](img/WildlifeAILogo.png)
 ![WildlifeAI Demo](img/config.PNG)
-*↑ Real-time species identification, quality scoring, and automatic organization*
-
-### **💸 Support Us!
 
 **[💖 Donate Now - Help Us Protect Wildlife Through Technology](https://www.paypal.com/donate/?hosted_button_id=727Q7SRX9JUFE)**
 ![PayPal](img/PayPalQR.png)
