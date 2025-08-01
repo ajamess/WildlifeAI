@@ -1513,15 +1513,19 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
   -- Execute with proper error handling
   Log.info('Using wrapped execution to work around LrTasks.execute() command line issues')
   
-  -- Start the command and monitor progress
+  -- NEW ARCHITECTURE: Main thread with background monitoring callback
   local success, errorMsg = LrTasks.pcall(function()
-    -- Monitor progress while processing
     local resultsJsonPath = LrPathUtils.child(tempOutputDir, 'results.json')
     local statusJsonPath = LrPathUtils.child(tempOutputDir, 'status.json')
     local startTime = os.time()
     local maxWaitTime = 300 -- 5 minutes max
     
-    -- Start the command in background using async task
+    -- Shared state between main and background threads
+    local monitoringComplete = false
+    local processedPhotos = {} -- Track which photos have been processed for metadata
+    local newResultsQueue = {} -- Queue of results ready for main thread processing
+    
+    -- Start the command in background
     local commandComplete = false
     local commandResult = nil
     
@@ -1532,196 +1536,180 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
       Log.info('Background command completed with result: ' .. tostring(commandResult))
     end)
     
-    -- Start monitoring immediately while command runs
-    Log.info('Starting immediate progress monitoring...')
-    
-    -- Enhanced monitoring with direct non-yielding metadata application
-    local isComplete = false
-    local lastProcessedCount = 0
-    local loopCount = 0
-    local processedPhotos = {} -- Track which photos have been updated with metadata
-    local keywordResults = {} -- Store results for batch keyword application later
-    
-    Log.info('Starting progress monitoring loop')
-    Log.info('Monitoring status file: ' .. statusJsonPath)
-    Log.info('Monitoring results file: ' .. resultsJsonPath)
-    Log.info('Expected photos to process: ' .. #photosToProcess)
-    
-    while not isComplete and (os.time() - startTime) < maxWaitTime do
-      loopCount = loopCount + 1
-      local currentTime = os.time() - startTime
+    -- Start pure monitoring in background thread
+    LrTasks.startAsyncTask(function()
+      Log.info('Starting BACKGROUND monitoring thread (pure monitoring only)')
+      local loopCount = 0
+      local lastProcessedCount = 0
+      local backgroundProcessedPhotos = {} -- Track detected results in background
       
-      -- Check for new individual results and apply metadata immediately
-      if LrFileUtils.exists(resultsJsonPath) then
-        local txt = LrFileUtils.readFile(resultsJsonPath)
-        if txt then
-          local ok, data = pcall(json.decode, txt)
-          if ok and type(data) == 'table' then
-            -- Process any new results that have appeared
-            for _, result in ipairs(data) do
-              local filename = result.filename
-              if filename and not processedPhotos[filename] then
-                -- Find the photo object for this result
-                for _, photo in ipairs(photosToProcess) do
-                  local photoPath = photo:getRawMetadata('path')
-                  local photoFilename = LrPathUtils.leafName(photoPath)
-                  if result.filename == photoFilename then
-                    -- Map enhanced runner fields to expected field names with proper numeric precision
-                    local function parseNumeric(value)
-                      if type(value) == 'number' then
-                        return value
-                      elseif type(value) == 'string' then
-                        local num = tonumber(value)
-                        return num or 0
-                      else
-                        return 0
+      while not monitoringComplete and (os.time() - startTime) < maxWaitTime do
+        loopCount = loopCount + 1
+        
+        -- BACKGROUND THREAD: Only monitor files, no metadata operations
+        if LrFileUtils.exists(resultsJsonPath) then
+          local txt = LrFileUtils.readFile(resultsJsonPath)
+          if txt then
+            local ok, data = pcall(json.decode, txt)
+            if ok and type(data) == 'table' then
+              -- Check for new results
+              for _, result in ipairs(data) do
+                local filename = result.filename
+                if filename and not backgroundProcessedPhotos[filename] then
+                  Log.info('BACKGROUND: New result detected for: ' .. filename)
+                  
+                  -- Find matching photo and create mapped result
+                  for _, photo in ipairs(photosToProcess) do
+                    local photoPath = photo:getRawMetadata('path')
+                    local photoFilename = LrPathUtils.leafName(photoPath)
+                    if result.filename == photoFilename then
+                      -- Map result and add to queue for main thread
+                      local function parseNumeric(value)
+                        if type(value) == 'number' then
+                          return value
+                        elseif type(value) == 'string' then
+                          local num = tonumber(value)
+                          return num or 0
+                        else
+                          return 0
+                        end
                       end
-                    end
-                    
-                    local mappedResult = {
-                      detected_species = result.species,
-                      species_confidence = parseNumeric(result.species_confidence),
-                      quality = parseNumeric(result.quality),
-                      rating = parseNumeric(result.rating),
-                      scene_count = parseNumeric(result.scene_count),
-                      feature_similarity = parseNumeric(result.feature_similarity),
-                      feature_confidence = parseNumeric(result.feature_confidence),
-                      color_similarity = parseNumeric(result.color_similarity),
-                      color_confidence = parseNumeric(result.color_confidence),
-                      processing_time = parseNumeric(result.processing_time),
-                      json_path = '', -- Will be set when saved
-                      photo_path = photoPath,
-                      export_path = result.export_path or '',
-                      crop_path = result.crop_path or ''
-                    }
-                    
-                    results[photoPath] = mappedResult
-                    
-                    -- Save results to photo directory
-                    savePhotoResults(photoPath, mappedResult)
-                    
-                    -- Apply plugin properties immediately (guaranteed non-yielding)
-                    local success, err = pcall(function()
-                      applySimpleNonYieldingMetadata(photo, mappedResult, prefs)
-                    end)
-                    
-                    if success then
-                      Log.info('Plugin properties applied for: ' .. filename)
-                    else
-                      Log.error('Plugin properties application failed for ' .. filename .. ': ' .. tostring(err))
-                    end
-                    
-                    -- Start async task for visual metadata updates (creates proper yielding context)
-                    LrTasks.startAsyncTask(function()
-                      Log.info('Starting async metadata task for: ' .. filename)
-                      local catalog = photo.catalog
                       
-                      -- Apply visual metadata in proper yielding context
-                      local metadataSuccess, metadataErr = pcall(function()
-                        catalog:withWriteAccessDo('WAI real-time metadata: ' .. filename, function()
-                          -- Apply complete metadata excluding keywords
-                          applyVisualMetadataOnly(photo, mappedResult, catalog, prefs)
-                        end, {timeout=30})
-                      end)
+                      local mappedResult = {
+                        detected_species = result.species,
+                        species_confidence = parseNumeric(result.species_confidence),
+                        quality = parseNumeric(result.quality),
+                        rating = parseNumeric(result.rating),
+                        scene_count = parseNumeric(result.scene_count),
+                        feature_similarity = parseNumeric(result.feature_similarity),
+                        feature_confidence = parseNumeric(result.feature_confidence),
+                        color_similarity = parseNumeric(result.color_similarity),
+                        color_confidence = parseNumeric(result.color_confidence),
+                        processing_time = parseNumeric(result.processing_time),
+                        json_path = '', -- Will be set when saved
+                        photo_path = photoPath,
+                        export_path = result.export_path or '',
+                        crop_path = result.crop_path or ''
+                      }
                       
-                      if metadataSuccess then
-                        Log.info('Async visual metadata applied for: ' .. filename)
-                      else
-                        Log.error('Async visual metadata failed for ' .. filename .. ': ' .. tostring(metadataErr))
-                      end
-                    end)
-                    
-                    processedPhotos[filename] = true
-                    Log.info('Real-time processing initiated for: ' .. filename)
-                    break
+                      -- Queue for main thread processing
+                      table.insert(newResultsQueue, {
+                        photo = photo,
+                        result = mappedResult,
+                        filename = filename
+                      })
+                      
+                      results[photoPath] = mappedResult
+                      backgroundProcessedPhotos[filename] = true
+                      Log.info('BACKGROUND: Queued result for main thread: ' .. filename)
+                      break
+                    end
                   end
                 end
               end
             end
           end
         end
-      end
-      
-      -- Check for status updates
-      if LrFileUtils.exists(statusJsonPath) then
-        Log.info('Status file exists, reading contents... (loop ' .. loopCount .. ')')
-        local statusContent = LrFileUtils.readFile(statusJsonPath)
-        if statusContent and statusContent ~= '' then
-          Log.info('Status file content length: ' .. #statusContent .. ' chars')
-          local ok, statusData = pcall(json.decode, statusContent)
-          if ok and statusData then
-            local processed = statusData.processed or 0
-            local total = statusData.total_photos or #photosToProcess
-            local currentPhoto = statusData.current_photo or ''
-            local status = statusData.status or 'processing'
-            local progressPercent = statusData.progress_percent or 0
-            
-            Log.info('Status JSON parsed - Status: ' .. status .. ', Processed: ' .. processed .. '/' .. total .. ', Progress: ' .. progressPercent .. '%')
-            
-            -- Check if processing is complete
-            if status == 'completed' or status == 'error' then
-              isComplete = true
-              Log.info('Processing completed with status: ' .. status)
-            end
-            
-            -- Update progress even if count hasn't changed (for better responsiveness)
-            if processed >= lastProcessedCount then
-              if progressCallback then
-                Log.info('Calling progress callback with: ' .. processed .. '/' .. total .. ' - "' .. currentPhoto .. '"')
-                progressCallback(processed, total, currentPhoto)
-              else
-                Log.warning('Progress callback is nil!')
-              end
+        
+        -- Check status for progress updates and completion
+        if LrFileUtils.exists(statusJsonPath) then
+          local statusContent = LrFileUtils.readFile(statusJsonPath)
+          if statusContent and statusContent ~= '' then
+            local ok, statusData = pcall(json.decode, statusContent)
+            if ok and statusData then
+              local processed = statusData.processed or 0
+              local total = statusData.total_photos or #photosToProcess
+              local currentPhoto = statusData.current_photo or ''
+              local status = statusData.status or 'processing'
               
+              -- Update progress if changed
               if processed > lastProcessedCount then
                 lastProcessedCount = processed
-                Log.info('Progress updated: ' .. processed .. '/' .. total .. ' - ' .. currentPhoto)
+                Log.info('BACKGROUND: Progress updated: ' .. processed .. '/' .. total .. ' - ' .. currentPhoto)
+              end
+              
+              -- Check for completion
+              if status == 'completed' or status == 'error' then
+                monitoringComplete = true
+                Log.info('BACKGROUND: Processing completed with status: ' .. status)
+                break
               end
             end
-          else
-            Log.error('Failed to parse status JSON: ' .. tostring(statusData))
           end
-        else
-          Log.warning('Status file exists but is empty or unreadable')
         end
-      else
-        Log.info('Status file does not exist yet (loop ' .. loopCount .. '), checking results.json...')
         
-        -- If no status file exists yet, check if results.json exists (for non-status runners)
-        if LrFileUtils.exists(resultsJsonPath) then
-          Log.info('Results file exists, checking content...')
-          local txt = LrFileUtils.readFile(resultsJsonPath)
-          if txt then
-            local ok, data = pcall(json.decode, txt)
-            if ok and type(data) == 'table' then
-              Log.info('Results file has ' .. #data .. ' results (expecting ' .. #photosToProcess .. ')')
-              if #data >= #photosToProcess then
-                isComplete = true
-                Log.info('Processing completed - results file has all expected results')
-              else
-                -- Provide fallback progress updates based on results count
-                if progressCallback then
-                  progressCallback(#data, #photosToProcess, 'Processing...')
-                end
-              end
-            end
-          end
-        else
-          Log.info('Results file also does not exist yet')
-        end
+        LrTasks.sleep(1.0) -- Background monitoring interval
       end
       
-      if not isComplete then
-        Log.info('Continuing monitoring loop (elapsed: ' .. currentTime .. 's)...')
-        -- Use LrTasks.sleep instead of busy waiting
-        LrTasks.sleep(1.0)
+      Log.info('BACKGROUND: Monitoring thread completed after ' .. loopCount .. ' iterations')
+    end)
+    
+    -- MAIN THREAD: Handle progress updates and apply metadata as results become available
+    Log.info('MAIN THREAD: Starting real-time metadata processing loop')
+    local mainLoopCount = 0
+    local lastQueueSize = 0
+    
+    while not monitoringComplete and (os.time() - startTime) < maxWaitTime do
+      mainLoopCount = mainLoopCount + 1
+      
+      -- Process any new results that appeared in the queue
+      if #newResultsQueue > lastQueueSize then
+        -- Process new items in queue
+        for i = lastQueueSize + 1, #newResultsQueue do
+          local item = newResultsQueue[i]
+          if not processedPhotos[item.filename] then
+            Log.info('MAIN THREAD: Processing metadata for: ' .. item.filename)
+            
+            -- Save results to photo directory
+            local saveSuccess = savePhotoResults(item.result.photo_path, item.result)
+            if saveSuccess then
+              Log.info('MAIN THREAD: Results saved for: ' .. item.filename)
+            end
+            
+            -- Apply plugin properties (should be safe in main thread)
+            local pluginSuccess, pluginErr = pcall(function()
+              applySimpleNonYieldingMetadata(item.photo, item.result, prefs)
+            end)
+            
+            if pluginSuccess then
+              Log.info('MAIN THREAD: Plugin properties applied for: ' .. item.filename)
+            else
+              Log.error('MAIN THREAD: Plugin properties failed for ' .. item.filename .. ': ' .. tostring(pluginErr))
+            end
+            
+            -- Apply visual metadata with catalog write access
+            local catalog = item.photo.catalog
+            local visualSuccess, visualErr = pcall(function()
+              catalog:withWriteAccessDo('WAI main thread metadata: ' .. item.filename, function()
+                applyVisualMetadataOnly(item.photo, item.result, catalog, prefs)
+              end, {timeout=30})
+            end)
+            
+            if visualSuccess then
+              Log.info('MAIN THREAD: Visual metadata applied for: ' .. item.filename)
+            else
+              Log.error('MAIN THREAD: Visual metadata failed for ' .. item.filename .. ': ' .. tostring(visualErr))
+            end
+            
+            processedPhotos[item.filename] = true
+            
+            -- Update progress callback
+            if progressCallback then
+              progressCallback(#processedPhotos, #photosToProcess, 'Processed: ' .. item.filename)
+            end
+          end
+        end
+        lastQueueSize = #newResultsQueue
       end
+      
+      -- Brief sleep to avoid busy waiting
+      LrTasks.sleep(0.1)
     end
     
-    Log.info('Progress monitoring loop completed after ' .. loopCount .. ' iterations')
+    Log.info('MAIN THREAD: Completed after ' .. mainLoopCount .. ' iterations, processed ' .. #processedPhotos .. ' photos')
     
     -- Verify completion
-    if isComplete then
+    if monitoringComplete then
       Log.info('Processing completed successfully')
       return true
     elseif (os.time() - startTime) >= maxWaitTime then

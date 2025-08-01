@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Support WildlifeAI](https://img.shields.io/badge/💖_Support_WildlifeAI-Donate_Now-ff6b6b?style=for-the-badge&logo=heart)](https://your-donation-link.com)
+[![Support WildlifeAI](https://img.shields.io/badge/💖_Support_WildlifeAI-Donate_Now-ff6b6b?style=for-the-badge&logo=heart)](https://www.paypal.com/donate/?hosted_button_id=727Q7SRX9JUFE)
 [![Download Latest](https://img.shields.io/badge/📥_Download-Latest_Release-4CAF50?style=for-the-badge&logo=download)](https://github.com/your-repo/releases/latest)
 [![Built on Project Kestrel](https://img.shields.io/badge/🔬_Built_on-Project_Kestrel-9C27B0?style=for-the-badge&logo=microscope)](https://github.com/project-kestrel)
 
@@ -15,8 +15,8 @@
 ## 🎬 **See WildlifeAI in Action**
 
 *Watch as WildlifeAI instantly transforms your bird photography workflow:*
-
-![WildlifeAI Demo](docs/images/demo-animation.gif)
+![Banner](img/WildlifeAILogo.png)
+![WildlifeAI Demo](img/config.png)
 *↑ Real-time species identification, quality scoring, and automatic organization*
 
 ### **💸 Support Wildlife Conservation & AI Research**
@@ -28,8 +28,8 @@ WildlifeAI is **free and open-source**, but maintaining AI models and supporting
 - 🔬 **Fund research** into automated wildlife monitoring
 - 🚀 **Add new features** and support for more bird species
 
-**[💖 Donate Now - Help Us Protect Wildlife Through Technology](https://your-donation-link.com)**
-
+**[💖 Donate Now - Help Us Protect Wildlife Through Technology](https://www.paypal.com/donate/?hosted_button_id=727Q7SRX9JUFE)**
+![PayPal](img/PayPalQR.png)
 ---
 
 ## 🚀 **What WildlifeAI Does for You**
@@ -38,7 +38,7 @@ WildlifeAI revolutionizes your bird photography workflow by automatically:
 
 ### **🎯 Instant Species Identification**
 ![Species Identification](docs/images/species-identification.png)
-- **Identifies 1000+ bird species** with precision AI models
+- **Identifies 400+ bird species** with precision AI models
 - **Confidence scoring** so you know when to trust the identification
 - **Automatic keyword tagging** for instant searchability
 - **IPTC metadata integration** for professional workflows
