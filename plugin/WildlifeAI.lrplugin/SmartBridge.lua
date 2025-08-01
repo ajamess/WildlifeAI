@@ -311,6 +311,296 @@ local function applySimpleNonYieldingMetadata(photo, data, prefs)
   Log.info('Simple non-yielding metadata applied for: ' .. LrPathUtils.leafName(photoPath))
 end
 
+-- Helper function to apply visual metadata only (excluding keywords) in async task
+local function applyVisualMetadataOnly(photo, data, catalog, prefs)
+  local photoPath = photo:getRawMetadata('path')
+  
+  -- Set all properties with meaningful defaults and enhanced precision
+  local species = data.detected_species or 'Unknown'
+  local speciesConf = data.species_confidence or 0
+  local quality = data.quality or -1
+  local rating = data.rating or 0
+  local sceneCount = data.scene_count or 1
+  
+  -- Helper function for formatting with 2 decimal precision for 0-100 scale values
+  local function formatPrecision(value, is0to100Scale)
+    if not value or value < 0 then return 'N/A' end
+    if is0to100Scale and value >= 0 and value <= 100 then
+      return string.format('%.2f', value)
+    else
+      return tostring(value)
+    end
+  end
+  
+  Log.info('Applying visual metadata for ' .. LrPathUtils.leafName(photoPath) .. ': Species=' .. 
+           (species ~= 'Unknown' and species or 'No Bird Detected') .. 
+           ', Quality=' .. (quality >= 0 and tostring(quality) or 'N/A') ..
+           ', Rating=' .. rating)
+  
+  -- Apply automatic rating, flagging, and color labeling based on preferences
+  local ratingValue = rating
+  local qualityValue = quality >= 0 and quality or 0
+  
+  -- Set star rating (0-5 stars)
+  if prefs.enableRating and photo.setRawMetadata then
+    local success, err = pcall(function()
+      photo:setRawMetadata('rating', ratingValue)
+    end)
+    if not success then
+      Log.error('Failed to set rating: ' .. tostring(err))
+    else
+      Log.info('Set rating: ' .. ratingValue .. ' stars for ' .. LrPathUtils.leafName(photoPath))
+    end
+  end
+  
+  -- Enhanced rejection/picks logic with quality mode support
+  local qualityMode = prefs.qualityMode or 'rating'
+  
+  -- Set rejection flag for low quality photos
+  if prefs.enableRejection and photo.setRawMetadata then
+    local shouldReject = false
+    local thresholdDesc = ''
+    
+    if qualityMode == 'quality' then
+      local threshold = prefs.rejectionQualityThreshold or 20
+      shouldReject = qualityValue <= threshold
+      thresholdDesc = 'quality ' .. qualityValue .. ' <= ' .. threshold
+    else
+      local threshold = prefs.rejectionThreshold or 2
+      shouldReject = ratingValue <= threshold
+      thresholdDesc = 'rating ' .. ratingValue .. ' <= ' .. threshold
+    end
+    
+    local success, err = pcall(function()
+      photo:setRawMetadata('pickStatus', shouldReject and -1 or 0)
+    end)
+    if not success then
+      Log.error('Failed to set rejection flag: ' .. tostring(err))
+    elseif shouldReject then
+      Log.info('Marked as rejected: ' .. LrPathUtils.leafName(photoPath) .. ' (' .. thresholdDesc .. ')')
+    end
+  end
+  
+  -- Set pick flag for high quality photos
+  if prefs.enablePicks and photo.setRawMetadata then
+    local shouldPick = false
+    local thresholdDesc = ''
+    
+    if qualityMode == 'quality' then
+      local threshold = prefs.picksQualityThreshold or 80
+      shouldPick = qualityValue >= threshold
+      thresholdDesc = 'quality ' .. qualityValue .. ' >= ' .. threshold
+    else
+      local threshold = prefs.picksThreshold or 4
+      shouldPick = ratingValue >= threshold
+      thresholdDesc = 'rating ' .. ratingValue .. ' >= ' .. threshold
+    end
+    
+    local success, err = pcall(function()
+      photo:setRawMetadata('pickStatus', shouldPick and 1 or 0)
+    end)
+    if not success then
+      Log.error('Failed to set pick flag: ' .. tostring(err))
+    elseif shouldPick then
+      Log.info('Marked as pick: ' .. LrPathUtils.leafName(photoPath) .. ' (' .. thresholdDesc .. ')')
+    end
+  end
+  
+  -- Enhanced color label logic with quality range support
+  if prefs.enableColorLabels and photo.setRawMetadata then
+    local colorLabel = nil
+    local colorLabelMode = prefs.colorLabelMode or 'rating'
+    
+    if colorLabelMode == 'quality' then
+      -- Check each color range using separate min/max preferences with enable flags
+      local ranges = {}
+      
+      -- Only add enabled ranges
+      if prefs.colorRangeRedEnabled then
+        table.insert(ranges, { 
+          color = 'red', 
+          min = tonumber(prefs.colorRangeRedMin) or 0, 
+          max = tonumber(prefs.colorRangeRedMax) or 20 
+        })
+      end
+      
+      if prefs.colorRangeYellowEnabled then
+        table.insert(ranges, { 
+          color = 'yellow', 
+          min = tonumber(prefs.colorRangeYellowMin) or 21, 
+          max = tonumber(prefs.colorRangeYellowMax) or 40 
+        })
+      end
+      
+      if prefs.colorRangeGreenEnabled then
+        table.insert(ranges, { 
+          color = 'green', 
+          min = tonumber(prefs.colorRangeGreenMin) or 41, 
+          max = tonumber(prefs.colorRangeGreenMax) or 60 
+        })
+      end
+      
+      if prefs.colorRangeBlueEnabled then
+        table.insert(ranges, { 
+          color = 'blue', 
+          min = tonumber(prefs.colorRangeBlueMin) or 61, 
+          max = tonumber(prefs.colorRangeBlueMax) or 80 
+        })
+      end
+      
+      if prefs.colorRangePurpleEnabled then
+        table.insert(ranges, { 
+          color = 'purple', 
+          min = tonumber(prefs.colorRangePurpleMin) or 81, 
+          max = tonumber(prefs.colorRangePurpleMax) or 100 
+        })
+      end
+      
+      -- Add "none" range if enabled
+      if prefs.colorRangeNoneEnabled then
+        table.insert(ranges, { 
+          color = 'none', 
+          min = tonumber(prefs.colorRangeNoneMin) or 0, 
+          max = tonumber(prefs.colorRangeNoneMax) or 0 
+        })
+      end
+      
+      for _, colorRange in ipairs(ranges) do
+        if qualityValue >= colorRange.min and qualityValue <= colorRange.max then
+          colorLabel = colorRange.color
+          Log.info('Quality ' .. qualityValue .. ' matches ' .. colorRange.color .. ' range ' .. colorRange.min .. '-' .. colorRange.max)
+          break
+        end
+      end
+    else
+      -- Rating-based color mapping (0-5)
+      if ratingValue == 0 then colorLabel = prefs.colorLabel0
+      elseif ratingValue == 1 then colorLabel = prefs.colorLabel1
+      elseif ratingValue == 2 then colorLabel = prefs.colorLabel2
+      elseif ratingValue == 3 then colorLabel = prefs.colorLabel3
+      elseif ratingValue == 4 then colorLabel = prefs.colorLabel4
+      elseif ratingValue == 5 then colorLabel = prefs.colorLabel5
+      end
+    end
+    
+    if colorLabel and colorLabel ~= 'none' then
+      local success, err = pcall(function()
+        photo:setRawMetadata('colorNameForLabel', colorLabel)
+      end)
+      if not success then
+        Log.error('Failed to set color label: ' .. tostring(err))
+      else
+        local basis = colorLabelMode == 'quality' and ('quality ' .. qualityValue) or ('rating ' .. ratingValue)
+        Log.info('Set color label: ' .. colorLabel .. ' for ' .. LrPathUtils.leafName(photoPath) .. ' (' .. basis .. ')')
+      end
+    end
+  end
+  
+  -- Enhanced IPTC mirroring with configurable fields and elements
+  if prefs.enableIptcMirror and prefs.iptcField and prefs.iptcField ~= 'none' and photo.setRawMetadata then
+    local elements = {}
+    
+    -- Build structured metadata string based on user preferences with 2-char qualifiers
+    if prefs.includeQuality and quality >= 0 then
+      table.insert(elements, 'Qu:' .. formatPrecision(quality, true))
+    end
+    
+    if prefs.includeRating and rating > 0 then
+      table.insert(elements, 'Ra:' .. tostring(rating))
+    end
+    
+    if prefs.includeSpeciesConfidence and speciesConf >= 0 then
+      table.insert(elements, 'Co:' .. formatPrecision(speciesConf, true))
+    end
+    
+    if prefs.includeDetectedSpecies and species and species ~= 'Unknown' and species ~= '' then
+      table.insert(elements, 'Sp:' .. species)
+    end
+    
+    if prefs.includeSceneCount and sceneCount > 0 then
+      table.insert(elements, 'Sc:' .. tostring(sceneCount))
+    end
+    
+    if prefs.includeFeatureSimilarity and data.feature_similarity and data.feature_similarity >= 0 then
+      table.insert(elements, 'Fs:' .. formatPrecision(data.feature_similarity, true))
+    end
+    
+    if prefs.includeFeatureConfidence and data.feature_confidence and data.feature_confidence >= 0 then
+      table.insert(elements, 'Fc:' .. formatPrecision(data.feature_confidence, true))
+    end
+    
+    if prefs.includeColorSimilarity and data.color_similarity and data.color_similarity >= 0 then
+      table.insert(elements, 'Cs:' .. formatPrecision(data.color_similarity, true))
+    end
+    
+    if prefs.includeColorConfidence and data.color_confidence and data.color_confidence >= 0 then
+      table.insert(elements, 'Cc:' .. formatPrecision(data.color_confidence, true))
+    end
+    
+    if prefs.includeProcessingTime and data.processing_time and data.processing_time > 0 then
+      table.insert(elements, 'Pt:' .. string.format('%.2f', data.processing_time))
+    end
+    
+    if #elements > 0 then
+      local iptcValue = 'WAI ' .. table.concat(elements, ' ')
+      local success, err = pcall(function()
+        photo:setRawMetadata(prefs.iptcField, iptcValue)
+      end)
+      if not success then
+        Log.error('Failed to set IPTC field ' .. prefs.iptcField .. ': ' .. tostring(err))
+      else
+        Log.info('Set IPTC ' .. prefs.iptcField .. ': ' .. iptcValue .. ' for ' .. LrPathUtils.leafName(photoPath))
+      end
+    end
+  end
+  
+  -- Legacy job identifier support (for backward compatibility) - only if IPTC is not using jobIdentifier
+  if prefs.mirrorJobId and photo.setRawMetadata and (not prefs.enableIptcMirror or prefs.iptcField ~= 'jobIdentifier') then
+    local jid = string.format('Q:%s R:%s C:%s', formatPrecision(quality, true), rating, sceneCount)
+    local success, err = pcall(function()
+      photo:setRawMetadata('jobIdentifier', jid)
+    end)
+    if not success then
+      Log.error('Failed to set job identifier: ' .. tostring(err))
+    else
+      Log.info('Set job identifier: ' .. jid .. ' for ' .. LrPathUtils.leafName(photoPath))
+    end
+  end
+  
+  -- Enhanced XMP writing with proper error handling and retry logic
+  if prefs.writeXMP then
+    local success, err = pcall(function()
+      -- Force metadata to be written to XMP sidecar files
+      if photo.saveMetadata then
+        photo:saveMetadata()
+        Log.info('Saved XMP metadata for: ' .. LrPathUtils.leafName(photoPath))
+      else
+        Log.warning('saveMetadata not available for photo: ' .. LrPathUtils.leafName(photoPath))
+      end
+    end)
+    if not success then
+      Log.error('Failed to save XMP metadata: ' .. tostring(err))
+      
+      -- Retry with alternative approach
+      local retrySuccess, retryErr = pcall(function()
+        -- Alternative: use catalog's saveMetadata if available
+        if catalog and catalog.saveMetadata then
+          catalog:saveMetadata(photo)
+          Log.info('Saved XMP metadata via catalog for: ' .. LrPathUtils.leafName(photoPath))
+        end
+      end)
+      if not retrySuccess then
+        Log.error('XMP retry also failed: ' .. tostring(retryErr))
+      end
+    end
+  end
+  
+  -- NOTE: Keywords are NOT applied here - this function only handles visual metadata
+  -- Keywords will be handled in the batch processing phase if enabled
+  
+  Log.info('Visual metadata applied for: ' .. LrPathUtils.leafName(photoPath))
+end
+
 -- Helper function to apply only non-yielding metadata (for real-time updates)
 local function applyNonYieldingMetadata(photo, data, catalog, prefs)
   local photoPath = photo:getRawMetadata('path')
@@ -1310,23 +1600,39 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
                     -- Save results to photo directory
                     savePhotoResults(photoPath, mappedResult)
                     
-                    -- Store result for batch keyword processing later
-                    keywordResults[photoPath] = mappedResult
-                    
-                    -- Apply non-yielding metadata directly (synchronously in monitoring loop)
+                    -- Apply plugin properties immediately (guaranteed non-yielding)
                     local success, err = pcall(function()
-                      -- Apply ONLY safe, non-yielding metadata operations
                       applySimpleNonYieldingMetadata(photo, mappedResult, prefs)
                     end)
                     
                     if success then
-                      Log.info('Real-time metadata applied for: ' .. filename)
+                      Log.info('Plugin properties applied for: ' .. filename)
                     else
-                      Log.error('Real-time metadata application failed for ' .. filename .. ': ' .. tostring(err))
+                      Log.error('Plugin properties application failed for ' .. filename .. ': ' .. tostring(err))
                     end
                     
+                    -- Start async task for visual metadata updates (creates proper yielding context)
+                    LrTasks.startAsyncTask(function()
+                      Log.info('Starting async metadata task for: ' .. filename)
+                      local catalog = photo.catalog
+                      
+                      -- Apply visual metadata in proper yielding context
+                      local metadataSuccess, metadataErr = pcall(function()
+                        catalog:withWriteAccessDo('WAI real-time metadata: ' .. filename, function()
+                          -- Apply complete metadata excluding keywords
+                          applyVisualMetadataOnly(photo, mappedResult, catalog, prefs)
+                        end, {timeout=30})
+                      end)
+                      
+                      if metadataSuccess then
+                        Log.info('Async visual metadata applied for: ' .. filename)
+                      else
+                        Log.error('Async visual metadata failed for ' .. filename .. ': ' .. tostring(metadataErr))
+                      end
+                    end)
+                    
                     processedPhotos[filename] = true
-                    Log.info('Real-time processing completed for: ' .. filename)
+                    Log.info('Real-time processing initiated for: ' .. filename)
                     break
                   end
                 end
@@ -1580,58 +1886,10 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
     end
   end
   
-  -- Apply Lightroom metadata and keywords in batch after all photos are processed
-  if keywordResults and next(keywordResults) then
-    -- Count actual results
-    local batchCount = 0
-    for _ in pairs(keywordResults) do
-      batchCount = batchCount + 1
-    end
-    
-    Log.info('Starting batch Lightroom metadata and keyword application for ' .. batchCount .. ' photos')
-    
-    local batchProgress = LrProgressScope {
-      title = 'Applying Lightroom metadata and keywords...',
-      functionContext = nil
-    }
-    
-    local processedCount = 0
-    for photoPath, result in pairs(keywordResults) do
-      local photo = photosMap[photoPath]
-      if photo then
-        batchProgress:setPortionComplete(processedCount, batchCount)
-        batchProgress:setCaption('Applying metadata to ' .. LrPathUtils.leafName(photoPath))
-        
-        -- Apply full metadata including ratings, flags, colors, keywords in proper catalog context
-        local catalog = photo.catalog
-        local success, err = pcall(function()
-          catalog:withWriteAccessDo('WAI batch metadata application', function()
-            -- Apply the complete metadata set including ratings, flags, colors, IPTC, keywords
-            applyMetadataToPhoto(photo, {[photoPath] = result}, catalog, prefs)
-          end, {timeout=60})
-        end)
-        
-        if success then
-          Log.info('Batch metadata and keywords applied for: ' .. LrPathUtils.leafName(photoPath))
-        else
-          Log.error('Batch metadata application failed for ' .. LrPathUtils.leafName(photoPath) .. ': ' .. tostring(err))
-        end
-        
-        processedCount = processedCount + 1
-        
-        -- Check for user cancellation
-        if batchProgress:isCanceled() then
-          Log.info('User cancelled batch metadata application')
-          break
-        end
-      end
-    end
-    
-    batchProgress:done()
-    Log.info('Batch metadata and keyword application completed for ' .. processedCount .. '/' .. batchCount .. ' photos')
-  else
-    Log.info('No results to process in batch mode')
-  end
+  -- DISABLED: Batch keyword processing to avoid yielding issues
+  -- All visual metadata is now applied in real-time via async tasks
+  -- Keywords functionality is preserved but disabled until further testing
+  Log.info('Batch keyword processing disabled - all metadata applied in real-time')
   
   -- Cleanup temp files AFTER ensuring execution is complete
   if tmp then
