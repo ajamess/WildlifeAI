@@ -1,4 +1,99 @@
-venv/
+# WildlifeAI .gitignore
+
+# Build outputs
 dist/
+build/
+out/
+*.exe
+*.app
+*.dmg
+
+# Python
 __pycache__/
-*.spec
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# PyInstaller
+*.manifest
+*.spec.bak
+
+# Logs
+*.log
+logs/
+wildlifeai_*.log
+runner_debug.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+wai_*
+wildlifeai_temp_*
+
+# Model files (large files - use Git LFS)
+models/*.onnx
+models/*.keras
+models/*.h5
+models/*.pb
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Adobe Lightroom
+*.lrcat
+*.lrcat-lock
+*.lrdata
+
+# Test outputs
+test_output/
+test_results/
+regression_test_*/
+
+# User configuration (contains personal paths)
+user_config.json
+local_settings.lua
+
+# Lightroom plugin development
+*.zip.old
+*_backup/
+
+# Windows
+*.exe.config
+*.exe.manifest
+
+# macOS
+*.dSYM/
+
+# Documentation builds
+docs/_build/
+docs/site/

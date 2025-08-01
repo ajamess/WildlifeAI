@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2024 WildlifeAI
+Copyright (c) 2025 WildlifeAI Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+==============================================================================
+
+AI Model Licenses & Attributions:
+
+This software incorporates AI models and training data from Project Kestrel,
+which are subject to their own licensing terms. Please refer to:
+- Project Kestrel License: https://github.com/project-kestrel/LICENSE
+- Species Model Attribution: See models/ATTRIBUTION.md
+- Training Data Sources: See docs/DATA_SOURCES.md
+
+The AI models included with this software are for non-commercial research and
+educational use. Commercial use requires separate licensing agreements with
+the model providers.
+
+==============================================================================
+
+Third-Party Dependencies:
+
+This software uses the following open-source libraries:
+- TensorFlow (Apache 2.0 License)
+- PyTorch (BSD-3-Clause License)
+- OpenCV (Apache 2.0 License)
+- ONNX Runtime (MIT License)
+- NumPy (BSD License)
+- Pillow (HPND License)
+- Adobe Lightroom SDK (Adobe License)
+
+Full dependency licenses can be found in the THIRD_PARTY_LICENSES file.

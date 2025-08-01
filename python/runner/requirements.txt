@@ -1,9 +1,17 @@
-onnxruntime-gpu
-onnxruntime
-rawpy
-pillow
-numpy
-torch
-torchvision
-opencv-python
-tensorflow
+# Save as: python/runner/requirements.txt
+# Core ML libraries
+onnxruntime>=1.15.0
+tensorflow>=2.13.0
+
+# Image processing
+pillow>=9.0.0
+opencv-python>=4.7.0
+rawpy>=0.18.0
+numpy>=1.21.0
+
+# Build tools
+pyinstaller>=5.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0

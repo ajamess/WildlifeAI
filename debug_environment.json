@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-07-31 13:03:57",
+  "command_line": [
+    "C:\\Users\\Adam Steenwyk\\Documents\\Code\\WildlifeAI\\dist\\wildlifeai_runner_cpu.exe",
+    "--debug-env",
+    "--output-dir",
+    "C:\\temp\\debug_test"
+  ],
+  "python_info": {
+    "version": "3.11.6 (tags/v3.11.6:8b6ee5b, Oct  2 2023, 14:57:12) [MSC v.1935 64 bit (AMD64)]",
+    "executable": "C:\\Users\\Adam Steenwyk\\Documents\\Code\\WildlifeAI\\dist\\wildlifeai_runner_cpu.exe",
+    "frozen": true,
+    "meipass": "C:\\Users\\ADAMST~1\\AppData\\Local\\Temp\\_MEI603202"
+  },
+  "process_info": {
+    "pid": 23092,
+    "ppid": 60320,
+    "cwd": "C:\\Users\\Adam Steenwyk\\Documents\\Code\\WildlifeAI"
+  },
+  "environment": {
+    "PATH": "C:\\Users\\Adam Steenwyk\\AppData\\Local\\Temp\\_MEI603202\\cv2\\../../x64/vc17/bin;C:\\Users\\Adam Steenwyk\\Documents\\Code\\WildlifeAI\\.venv\\Scripts;C:/Users/ADAMST~1/AppData/Local/Autodesk/WEBDEP~1/PRODUC~1/2B8B8D~1/APPLIC~1/FABRIC~1;C:\\Users\\Adam Steenwyk\\AppData\\Local\\Temp\\THUXWDWPMF.STRM\\lib;C:\\Program Files\\ImageMagick-7.1.2-Q8;C:\\Python313\\Scripts;C:\\Python313;C:\\Program Files\\Python312\\Scripts;C:\\Program Files\\Python312;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\Eclipse",
+    "TEMP": "C:\\Users\\ADAMST~1\\AppData\\Local\\Temp",
+    "TMP": "C:\\Users\\ADAMST~1\\AppData\\Local\\Temp",
+    "USERPROFILE": "C:\\Users\\Adam Steenwyk",
+    "USERNAME": "Adam Steenwyk"
+  },
+  "file_system_tests": {
+    "temp_dir": "C:\\Users\\ADAMST~1\\AppData\\Local\\Temp",
+    "temp_write": "SUCCESS"
+  },
+  "startup_errors": [],
+  "pyinstaller": {
+    "meipass": "C:\\Users\\ADAMST~1\\AppData\\Local\\Temp\\_MEI603202",
+    "meipass_exists": true,
+    "models_exist": true,
+    "model_files": [
+      "labels.txt",
+      "model.onnx",
+      "quality.keras"
+    ]
+  }
+}

@@ -19,6 +19,7 @@ end
 function M.path() return ensure() end
 function M.info(m) write('INFO',m) end
 function M.debug(m) write('DEBUG',m) end
+function M.warning(m) write('WARNING',m) end
 function M.error(m) write('ERROR',m) end
 function M.enter(name) write('TRACE','>> '..name); return os.clock(), name end
 function M.leave(clk,name) name=name or '?'; write('TRACE','<< '..name..' ('..string.format('%.3f',os.clock()-clk)..'s)') end
