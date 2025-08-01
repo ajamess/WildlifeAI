@@ -16,17 +16,10 @@
 
 *Watch as WildlifeAI instantly transforms your bird photography workflow:*
 ![Banner](img/WildlifeAILogo.png)
-![WildlifeAI Demo](img/config.png)
+![WildlifeAI Demo](img/config.PNG)
 *↑ Real-time species identification, quality scoring, and automatic organization*
 
-### **💸 Support Wildlife Conservation & AI Research**
-
-WildlifeAI is **free and open-source**, but maintaining AI models and supporting wildlife research takes resources. Your donation helps:
-
-- 🧠 **Train better AI models** for more accurate species identification
-- 🌍 **Support wildlife conservation projects** that provide training data
-- 🔬 **Fund research** into automated wildlife monitoring
-- 🚀 **Add new features** and support for more bird species
+### **💸 Support Us!
 
 **[💖 Donate Now - Help Us Protect Wildlife Through Technology](https://www.paypal.com/donate/?hosted_button_id=727Q7SRX9JUFE)**
 ![PayPal](img/PayPalQR.png)
