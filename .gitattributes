@@ -6,3 +6,4 @@
 *.keras filter=lfs diff=lfs merge=lfs -text
 *.ARW filter=lfs diff=lfs merge=lfs -text
 *.CR3 filter=lfs diff=lfs merge=lfs -text
+*.exe filter=lfs diff=lfs merge=lfs -text
