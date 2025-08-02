@@ -525,20 +525,21 @@ return function(context)
       f:spacer { height = 10 },
       
       -- Flag Settings
-      f:column {
-        f:static_text { 
-          title = 'Flag Settings:', 
-          font = '<system/bold>'
-        },
-        
-        f:spacer { height = 5 },
-        
+      f:static_text {
+        title = 'Flag Settings:',
+        font = '<system/bold>'
+      },
+
+      f:spacer { height = 5 },
+
+      -- Header row with mode selection
+      f:row {
+        spacing = 10,
         f:radio_button {
           title = '0-5 Rating Scale (based on computed rating)',
           value = bind('qualityMode'),
           checked_value = 'rating'
         },
-        
         f:radio_button {
           title = '0-100 Quality Scale (based on raw quality)',
           value = bind('qualityMode'),
@@ -548,11 +549,11 @@ return function(context)
       
       f:spacer { height = 10 },
       
-      -- Rating-based thresholds (0-5) - only visible when rating mode selected
+      -- Rating-based thresholds (0-5)
       f:column {
-        visible = bind {
+        enabled = bind {
           key = 'qualityMode',
-          transform = function(value) return value == 'rating' end
+          transform = function(value) return value ~= 'rating' end
         },
         spacing = f:control_spacing(),
         
@@ -589,11 +590,11 @@ return function(context)
         }
       },
       
-      -- Quality-based thresholds (0-100) - only visible when quality mode selected
+      -- Quality-based thresholds (0-100)
       f:column {
-        visible = bind {
+        enabled = bind {
           key = 'qualityMode',
-          transform = function(value) return value == 'quality' end
+          transform = function(value) return value ~= 'quality' end
         },
         spacing = f:control_spacing(),
         
