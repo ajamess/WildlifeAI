@@ -5,6 +5,7 @@ local LrPathUtils = import 'LrPathUtils'
 local LrPrefs = import 'LrPrefs'
 local LrDialogs = import 'LrDialogs'
 local LrProgressScope = import 'LrProgressScope'
+local LrApplication = import 'LrApplication'
 local json = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/dkjson.lua') )
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local KeywordHelper = dofile( LrPathUtils.child(_PLUGIN.path, 'KeywordHelper.lua') )
@@ -1533,6 +1534,28 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
     local monitoringComplete = false
     local processedPhotos = {} -- Track which photos have been processed for metadata
     local newResultsQueue = {} -- Queue of results ready for main thread processing
+
+    -- Metadata processing worker state
+    local catalog = LrApplication.activeCatalog()
+    local metadataQueue = {}
+    local metadataWorkerStop = false
+    LrTasks.startAsyncTask(function()
+      while not metadataWorkerStop or #metadataQueue > 0 do
+        local item = table.remove(metadataQueue, 1)
+        if item then
+          catalog:withWriteAccessDo('WAI Metadata Worker', function()
+            applyMetadataToPhoto(item.photo, {[item.photo:getRawMetadata('path')] = item.result}, catalog, prefs)
+            if metadataCallback then
+              local rMap = {[item.photo:getRawMetadata('path')] = item.result}
+              local pMap = {[item.photo:getRawMetadata('path')] = item.photo}
+              metadataCallback(rMap, pMap)
+            end
+          end, {timeout=120})
+        else
+          LrTasks.sleep(0.1)
+        end
+      end
+    end)
     
     -- Start the command in background
     local commandComplete = false
@@ -1677,6 +1700,9 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
             if saveSuccess then
               Log.info('MAIN THREAD: Results saved for: ' .. item.filename)
             end
+
+            -- Queue metadata application for this photo
+            table.insert(metadataQueue, { photo = item.photo, result = item.result })
             
             processedPhotos[item.filename] = true
             processedCount = processedCount + 1
@@ -1715,6 +1741,9 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
             if saveSuccess then
               Log.info('MAIN THREAD: Final results saved for: ' .. item.filename)
             end
+
+            -- Queue metadata application for this photo
+            table.insert(metadataQueue, { photo = item.photo, result = item.result })
             
             processedPhotos[item.filename] = true
             processedCount = processedCount + 1
@@ -1829,7 +1858,10 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
             
             -- Save results to photo directory
             savePhotoResults(photoPath, mappedResult)
-            
+
+            -- Queue metadata application for this photo
+            table.insert(metadataQueue, { photo = photo, result = mappedResult })
+
             Log.info('Processed and saved results for: ' .. filename)
             break
           end
@@ -1897,9 +1929,12 @@ function M.run(photos, progressCallback, forceReprocess, metadataCallback)
     end
   end
   
-  -- Metadata callback is now handled directly in Analyze.lua after SmartBridge.run() completes
-  -- This ensures proper yielding context without any interference from the monitoring threads
-  Log.info('SmartBridge.run() completed - metadata will be applied by caller in proper context')
+  -- Flush metadata queue and stop worker
+  metadataWorkerStop = true
+  while #metadataQueue > 0 do
+    LrTasks.sleep(0.1)
+  end
+  Log.info('SmartBridge.run() completed - metadata worker drained')
   
   -- Cleanup temp files AFTER ensuring execution is complete
   if tmp then
