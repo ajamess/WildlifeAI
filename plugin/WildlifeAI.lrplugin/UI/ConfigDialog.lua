@@ -661,32 +661,11 @@ return function(context)
       
       f:spacer { height = 8 },
       
-      -- Mode selection radio buttons
+      -- Settings
       f:column {
         enabled = bind('enableColorLabels'),
         spacing = f:control_spacing(),
-        
-        f:static_text { 
-          title = 'Label Assignment Mode:', 
-          font = '<system/bold>'
-        },
-        
-        f:spacer { height = 3 },
-        
-        f:radio_button {
-          title = 'Rating Scale (0-5 stars)',
-          value = bind('colorLabelMode'),
-          checked_value = 'rating'
-        },
-        
-        f:radio_button {
-          title = 'Quality Scale (0-100)',
-          value = bind('colorLabelMode'),
-          checked_value = 'quality'
-        },
-        
-        f:spacer { height = 8 },
-        
+
         -- Header row for 3-column layout
         f:row {
           spacing = 10,
@@ -698,26 +677,18 @@ return function(context)
             alignment = 'center'
           },
           
-          f:static_text { 
+          f:radio_button {
             title = 'Quality Range (0-100)',
-            font = '<system/bold>',
-            width = 150,
-            alignment = 'center',
-            enabled = bind {
-              key = 'colorLabelMode',
-              transform = function(value) return value == 'quality' end
-            }
+            value = bind('colorLabelMode'),
+            checked_value = 'quality',
+            width = 150, alignment = 'center'
           },
-          
-          f:static_text { 
+
+          f:radio_button {
             title = 'Rating Level (0-5)',
-            font = '<system/bold>',
-            width = 120,
-            alignment = 'center',
-            enabled = bind {
-              key = 'colorLabelMode',
-              transform = function(value) return value == 'rating' end
-            }
+            value = bind('colorLabelMode'),
+            checked_value = 'rating',
+            width = 120, alignment = 'center'
           }
         },
         
