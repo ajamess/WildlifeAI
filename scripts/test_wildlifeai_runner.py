@@ -11,7 +11,7 @@ from pathlib import Path
 def test_runner():
     """Test the enhanced runner functionality."""
     root = Path(__file__).parent.parent
-    runner_path = root / "python" / "runner" / "enhanced_wai_runner.py"
+    runner_path = root / "python" / "runner" / "wildlifeai_runner.py"
     
     if not runner_path.exists():
         print(f"ERROR: Enhanced runner not found at {runner_path}")

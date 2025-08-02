@@ -16,10 +16,6 @@ local function setupDefaultPrefs()
   if prefs.debugMode == nil then prefs.debugMode = true end
   if prefs.verboseRunner == nil then prefs.verboseRunner = true end
   
-  -- Force the values on each startup for debugging
-  prefs.debugMode = true
-  prefs.verboseRunner = true
-  
   -- Processing options
   prefs.enableStacking  = prefs.enableStacking  or false
   prefs.writeXMP        = prefs.writeXMP        or false

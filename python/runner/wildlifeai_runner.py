@@ -788,8 +788,6 @@ class EnhancedModelRunner:
         converted_color_similarity = int(similarity.get('color_similarity', 0))
         converted_color_confidence = int(similarity.get('color_confidence', 0) * 100) if similarity.get('color_confidence', 0) > 0 else int(similarity.get('color_confidence', 0))
         
-        # Debug the conversion
-        logging.info(f"DEBUG: species_confidence={species_confidence}, converted_species_confidence={converted_species_confidence}")
         
         result = {
             "filename": Path(photo_path).name,
