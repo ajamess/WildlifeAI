@@ -13,7 +13,7 @@ import os
 # Add the python runner to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "python" / "runner"))
 
-from enhanced_wai_runner import ModelRunner
+from wildlifeai_runner import EnhancedModelRunner as ModelRunner
 
 
 class TestEnhancedRunner:
@@ -167,7 +167,7 @@ class TestEnhancedRunner:
             # Run the enhanced runner
             cmd = [
                 sys.executable,
-                "python/runner/enhanced_wai_runner.py",
+                "python/runner/wildlifeai_runner.py",
                 "--photo-list", str(photo_list),
                 "--output-dir", str(tmpdir_path),
                 "--max-workers", "1",
@@ -196,10 +196,10 @@ class TestEnhancedRunner:
             # Run with GPU flag (should not crash even if no GPU)
             cmd = [
                 sys.executable,
-                "python/runner/enhanced_wai_runner.py",
+                "python/runner/wildlifeai_runner.py",
                 "--photo-list", str(photo_list),
                 "--output-dir", str(tmpdir_path),
-                "--use-gpu",
+                "--gpu",
                 "--max-workers", "1"
             ]
             

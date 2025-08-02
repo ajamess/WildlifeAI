@@ -209,11 +209,9 @@ local function findBestRunner()
       table.insert(candidates, LrPathUtils.child(binDir, 'wildlifeai_runner_gpu.exe'))
     end
     table.insert(candidates, LrPathUtils.child(binDir, 'wildlifeai_runner_cpu.exe'))
-    table.insert(candidates, LrPathUtils.child(binDir, 'kestrel_runner.exe'))  -- fallback
   else
     -- macOS: single universal binary
     table.insert(candidates, LrPathUtils.child(binDir, 'wildlifeai_runner'))
-    table.insert(candidates, LrPathUtils.child(binDir, 'kestrel_runner'))  -- fallback
   end
   
   -- Find first existing runner
