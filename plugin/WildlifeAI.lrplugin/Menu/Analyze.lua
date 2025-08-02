@@ -298,29 +298,9 @@ LrTasks.startAsyncTask(function()
       end
     end
     
-    -- Call SmartBridge WITHOUT metadata callback to avoid yielding context issues
-    local results = Bridge.run(photos, progressCallback, false, nil)
+    -- Call SmartBridge with metadata callback so metadata is applied per photo during processing
+    local results = Bridge.run(photos, progressCallback, false, metadataCallback)
     local prefs = LrPrefs.prefsForPlugin()
-    
-    -- APPLY METADATA IN COMPLETELY SEPARATE ASYNC TASK (proper yielding context)
-    if next(results) then
-      Log.info('DEFERRED METADATA: Scheduling metadata application in separate async task')
-      
-      -- Create photosMap from the photos array
-      local photosMapForCallback = {}
-      for _, photo in ipairs(photos) do
-        local photoPath = photo:getRawMetadata('path')
-        photosMapForCallback[photoPath] = photo
-      end
-      
-      -- Run metadata callback in completely separate async task to ensure proper yielding context
-      LrTasks.startAsyncTask(function()
-        Log.info('ASYNC METADATA: Starting metadata application in separate async task')
-        metadataCallback(results, photosMapForCallback)
-      end)
-    else
-      Log.info('DEFERRED METADATA: No results to process')
-    end
     if prefs.enableStacking then
       catalog:withWriteAccessDo('WAI Stack', function() require('QualityStack') end,{timeout=120})
     end
