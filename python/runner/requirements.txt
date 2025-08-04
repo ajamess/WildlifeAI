@@ -1,17 +1,12 @@
-# Save as: python/runner/requirements.txt
-# Core ML libraries
-onnxruntime>=1.15.0
-tensorflow>=2.13.0
-
-# Image processing
-pillow>=9.0.0
-opencv-python>=4.7.0
-rawpy>=0.18.0
-numpy>=1.21.0
-
-# Build tools
-pyinstaller>=5.0.0
-
-# Testing
-pytest>=7.0.0
-pytest-cov>=4.0.0
+torch>=2.4.1
+torchvision>=0.19.1
+tensorflow>=2.19.0
+onnxruntime-directml>=1.22.0   # use onnxruntime on macOS
+numpy>=2.1.3
+opencv-python>=4.11.0
+pillow>=11.2.1
+Wand>=0.6.13
+pandas>=2.2.3
+PyQt5>=5.15.11
+pyexiftool>=0.5.6
+requests>=2.32.3
