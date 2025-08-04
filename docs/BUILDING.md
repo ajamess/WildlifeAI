@@ -40,3 +40,15 @@ python scripts/package_plugin.py
 ```
 
 The archive will be created in the `dist/` directory.
+
+## Build and Test
+
+For an end-to-end build followed by a quick inference test, run:
+
+```bash
+scripts/build_and_test.sh
+```
+
+The script builds the runner with PyInstaller, packages the plug-in, and runs
+`python/runner/wai_runner.py` on the sample images in `tests/quick/original/`.
+It then verifies that a JSON file is produced for each image.
