@@ -34,10 +34,7 @@ if exist .venv (
 
 :: Upgrade pip and install dependencies
 pip install --upgrade pip
-
-:: Install all required dependencies including PyTorch
-echo Installing dependencies...
-pip install onnxruntime pillow numpy opencv-python rawpy tensorflow-cpu pyinstaller
+pip install -r python\runner\requirements.txt
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 :: Check if WildlifeAI runner exists
