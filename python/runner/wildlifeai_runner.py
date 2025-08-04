@@ -64,34 +64,22 @@ try:
 except ImportError:
     WandImage = None
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
 MODEL_DIR = ROOT / "models"
 
+
 def find_model_directory():
-    """Find the models directory in various possible locations."""
-    # Try the standard location first
-    if (MODEL_DIR / "model.onnx").exists() and (MODEL_DIR / "quality.keras").exists():
-        return MODEL_DIR
-    
-    # Try relative to the executable (for PyInstaller)
-    if hasattr(sys, '_MEIPASS'):
-        bundled_models = Path(sys._MEIPASS) / "models"
-        if bundled_models.exists():
-            return bundled_models
-    
-    # Try relative to the current executable location
-    exe_dir = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-    
-    # Check if we're in a plugin directory structure
-    plugin_models = exe_dir.parent.parent / "models"
-    if plugin_models.exists() and (plugin_models / "model.onnx").exists():
-        return plugin_models
-    
-    # Check same directory as executable
-    local_models = exe_dir / "models"
-    if local_models.exists() and (local_models / "model.onnx").exists():
-        return local_models
-    
+    """Find the models directory in various possible locations derived from ROOT."""
+    candidates = [
+        MODEL_DIR,
+        ROOT.parent / "models",
+        ROOT.parent.parent / "models",
+    ]
+
+    for candidate in candidates:
+        if (candidate / "model.onnx").exists() and (candidate / "quality.keras").exists():
+            return candidate
+
     # Return the default and let the calling code handle missing files
     return MODEL_DIR
 
@@ -1183,14 +1171,12 @@ def capture_debug_environment():
     # Test PyInstaller environment
     if hasattr(sys, '_MEIPASS'):
         try:
-            meipass_path = Path(sys._MEIPASS)
+            models_dir = ROOT / "models"
             debug_info["pyinstaller"] = {
-                "meipass": str(meipass_path),
-                "meipass_exists": meipass_path.exists(),
-                "models_exist": (meipass_path / "models").exists(),
+                "meipass": getattr(sys, '_MEIPASS', None),
+                "models_exist": models_dir.exists(),
             }
-            if (meipass_path / "models").exists():
-                models_dir = meipass_path / "models"
+            if models_dir.exists():
                 debug_info["pyinstaller"]["model_files"] = [f.name for f in models_dir.iterdir()]
         except Exception as e:
             debug_info["startup_errors"].append(f"PyInstaller environment error: {e}")
