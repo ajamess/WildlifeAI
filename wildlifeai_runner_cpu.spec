@@ -1,6 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
+
+# Collect additional data, binaries, and hidden imports
+tf_datas, tf_bins, tf_hidden = collect_all("tensorflow")
+ort_datas, ort_bins, ort_hidden = collect_all("onnxruntime")
+torch_bins = collect_dynamic_libs("torch")
 
 # Get the current directory and set up paths
 current_dir = Path.cwd()
@@ -9,69 +15,79 @@ models_dir = current_dir / "models"
 
 block_cipher = None
 
+# Base lists for Analysis inputs
+datas = [
+    (str(models_dir / 'model.onnx'), 'models'),
+    (str(models_dir / 'quality.keras'), 'models'),
+    (str(models_dir / 'labels.txt'), 'models'),
+]
+binaries = []
+hiddenimports = [
+    # TensorFlow components (for quality classifier)
+    'tensorflow',
+    'tensorflow.keras',
+    'tensorflow.keras.models',
+    'tensorflow.keras.layers',
+    'tensorflow.keras.utils',
+    'tensorflow.python',
+    'tensorflow.python.keras',
+    'tensorflow.python.keras.models',
+    'tensorflow.python.keras.layers',
+    'tensorflow.python.keras.engine',
+    'tensorflow.python.keras.engine.sequential',
+    'tensorflow.python.keras.engine.functional',
+    'tensorflow.python.saved_model',
+    'tensorflow.python.saved_model.loader',
+    'tensorflow.python.framework',
+    'tensorflow.python.framework.ops',
+    'tensorflow.python.ops',
+    'tensorflow.python.platform',
+    'tensorflow.python.platform.gfile',
+    'tensorflow.lite',
+    'keras',
+    'keras.models',
+    'keras.layers',
+    'keras.utils',
+    'keras.saving',
+    'keras.saving.legacy',
+    # ONNX Runtime
+    'onnxruntime',
+    # Core Python libraries
+    'numpy',
+    'PIL',
+    'cv2',
+    'rawpy',
+    'logging',
+    'json',
+    'csv',
+    'argparse',
+    'pathlib',
+    'concurrent.futures',
+    'time',
+    'sys',
+    'os',
+    # PyTorch components (for Mask R-CNN)
+    'torch',
+    'torchvision',
+    'torchvision.models',
+    'torchvision.models.detection',
+    'torchvision.models.detection.maskrcnn_resnet50_fpn',
+    'torchvision.transforms',
+    'torch.nn',
+    'torch.nn.functional'
+]
+
+# Append collected items
+datas += tf_datas + ort_datas
+binaries += tf_bins + ort_bins + torch_bins
+hiddenimports += tf_hidden + ort_hidden
+
 a = Analysis(
     [str(python_dir / 'wildlifeai_runner.py')],
     pathex=[str(current_dir)],
-    binaries=[],
-    datas=[
-        (str(models_dir / 'model.onnx'), 'models'),
-        (str(models_dir / 'quality.keras'), 'models'),
-        (str(models_dir / 'labels.txt'), 'models'),
-    ],
-    hiddenimports=[
-        # TensorFlow components (for quality classifier)
-        'tensorflow',
-        'tensorflow.keras',
-        'tensorflow.keras.models',
-        'tensorflow.keras.layers',
-        'tensorflow.keras.utils',
-        'tensorflow.python',
-        'tensorflow.python.keras',
-        'tensorflow.python.keras.models',
-        'tensorflow.python.keras.layers',
-        'tensorflow.python.keras.engine',
-        'tensorflow.python.keras.engine.sequential',
-        'tensorflow.python.keras.engine.functional',
-        'tensorflow.python.saved_model',
-        'tensorflow.python.saved_model.loader',
-        'tensorflow.python.framework',
-        'tensorflow.python.framework.ops',
-        'tensorflow.python.ops',
-        'tensorflow.python.platform',
-        'tensorflow.python.platform.gfile',
-        'tensorflow.lite',
-        'keras',
-        'keras.models',
-        'keras.layers',
-        'keras.utils',
-        'keras.saving',
-        'keras.saving.legacy',
-        # ONNX Runtime
-        'onnxruntime', 
-        # Core Python libraries
-        'numpy',
-        'PIL',
-        'cv2',
-        'rawpy',
-        'logging',
-        'json',
-        'csv',
-        'argparse',
-        'pathlib',
-        'concurrent.futures',
-        'time',
-        'sys',
-        'os',
-        # PyTorch components (for Mask R-CNN)
-        'torch',
-        'torchvision',
-        'torchvision.models',
-        'torchvision.models.detection',
-        'torchvision.models.detection.maskrcnn_resnet50_fpn',
-        'torchvision.transforms',
-        'torch.nn',
-        'torch.nn.functional'
-    ],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -97,7 +113,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,
