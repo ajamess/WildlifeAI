@@ -13,12 +13,13 @@ a Python virtual environment and execution of PyInstaller.
 ## Windows
 
 ```cmd
-scripts\freeze_win.bat
+scripts\freeze_wildlifeai_win.bat
 ```
 
 The script creates `venv/`, installs dependencies from
 `python\runner\requirements.txt`, runs PyInstaller and copies the resulting
-`kestrel_runner.exe` to `plugin\WildlifeAI.lrplugin\bin\win`. Finally the plug-in
+`wildlifeai_runner_cpu.exe` to `plugin\WildlifeAI.lrplugin\bin\win`. For compatibility,
+it also creates a copy named `kestrel_runner.exe` in the same directory. Finally the plug-in
 is zipped to `dist\WildlifeAI.lrplugin.zip`.
 
 ## macOS
