@@ -25,32 +25,69 @@ local function parseNumber(v)
   return tonumber(v) or 0
 end
 
+-- Safely read raw metadata fields
+local function safeGetMetadata(photo, field)
+  local ok, value = pcall(function() return photo:getRawMetadata(field) end)
+  if not ok then
+    Log.warning('Failed to read '..field..' from photo '..tostring(photo))
+    return nil
+  end
+  return value
+end
+
 local function getExposureValue(photo)
-  local shutter = parseNumber(photo:getRawMetadata('shutterSpeed'))
-  local aperture = parseNumber(photo:getRawMetadata('aperture'))
-  local iso = parseNumber(photo:getRawMetadata('isoSpeedRating'))
-  if shutter <= 0 or aperture <= 0 or iso <= 0 then return 0 end
+  local shutter = parseNumber(safeGetMetadata(photo, 'shutterSpeed'))
+  local aperture = parseNumber(safeGetMetadata(photo, 'aperture'))
+  local iso = parseNumber(safeGetMetadata(photo, 'isoSpeedRating'))
+  if shutter <= 0 or aperture <= 0 or iso <= 0 then return nil end
   local ev = math.log(aperture * aperture / shutter * 100 / iso, 2)
   return ev
+end
+
+local function getOrientation(photo)
+  return safeGetMetadata(photo, 'orientation')
 end
 
 -- Group photos by capture time
 local function groupByTime(photos, prefs)
   table.sort(photos, function(a,b)
-    return (a:getRawMetadata('captureTime') or 0) < (b:getRawMetadata('captureTime') or 0)
+    return (safeGetMetadata(a, 'captureTime') or 0) < (safeGetMetadata(b, 'captureTime') or 0)
   end)
   local groups = {}
   local cur, last = nil, nil
   local gap = prefs.timeGap or DEFAULTS.timeGap
   for _,p in ipairs(photos) do
-    local ct = p:getRawMetadata('captureTime') or 0
+    local ct = safeGetMetadata(p, 'captureTime') or 0
     if not last or (ct - last) <= gap then
-      if not cur then cur = {photos={}, exposures={}} end
+      if not cur then cur = {photos={}, exposures={}, orientations={}, lowConfidence=false} end
       table.insert(cur.photos, p)
-      table.insert(cur.exposures, getExposureValue(p))
+      local ev = getExposureValue(p)
+      if not ev then
+        cur.lowConfidence = true
+        Log.warning('Missing exposure data for '..tostring(p))
+      end
+      table.insert(cur.exposures, ev or 0)
+      local o = getOrientation(p)
+      if not o then
+        cur.lowConfidence = true
+        Log.warning('Missing orientation for '..tostring(p))
+      end
+      table.insert(cur.orientations, o)
     else
       table.insert(groups, cur)
-      cur = {photos={p}, exposures={getExposureValue(p)}}
+      cur = {photos={p}, exposures={}, orientations={}, lowConfidence=false}
+      local ev = getExposureValue(p)
+      if not ev then
+        cur.lowConfidence = true
+        Log.warning('Missing exposure data for '..tostring(p))
+      end
+      table.insert(cur.exposures, ev or 0)
+      local o = getOrientation(p)
+      if not o then
+        cur.lowConfidence = true
+        Log.warning('Missing orientation for '..tostring(p))
+      end
+      table.insert(cur.orientations, o)
     end
     last = ct
   end
@@ -60,6 +97,10 @@ end
 
 local function classifyGroup(g, prefs)
   local tol = prefs.exposureTolerance or DEFAULTS.exposureTolerance
+  if g.lowConfidence then
+    g.type = (#g.photos > 1) and 'bracket' or 'single'
+    return
+  end
   local unique = {}
   for _,ev in ipairs(g.exposures) do
     local bucket = math.floor(ev / tol + 0.5)
@@ -106,16 +147,20 @@ function M.analyzeBrackets(photos, prefs)
   for _,g in ipairs(groups) do
     classifyGroup(g, prefs)
     if g.type=='bracket' then
-      local idx=1
-      local minDiff=nil
-      for i,ev in ipairs(g.exposures) do
-        local diff = math.abs(ev)
-        if not minDiff or diff < minDiff then
-          minDiff = diff
-          idx = i
+      if g.lowConfidence then
+        g.top = g.photos[1]
+      else
+        local idx=1
+        local minDiff=nil
+        for i,ev in ipairs(g.exposures) do
+          local diff = math.abs(ev)
+          if not minDiff or diff < minDiff then
+            minDiff = diff
+            idx = i
+          end
         end
+        g.top = g.photos[idx]
       end
-      g.top = g.photos[idx]
     else
       g.top = g.photos[1]
     end
@@ -159,7 +204,13 @@ function M.analyze()
   end
   lastAnalysis = M.analyzeBrackets(photos)
   LrPrefs.prefsForPlugin().bracketAnalysisDone = true
-  LrDialogs.message('WildlifeAI', 'Bracket analysis complete.')
+  local low = 0
+  for _,g in ipairs(lastAnalysis) do if g.lowConfidence then low = low + 1 end end
+  local msg = 'Bracket analysis complete.'
+  if low > 0 then
+    msg = msg .. '\n' .. low .. ' group(s) lacked exposure or orientation data. Time gaps were used and results may be less accurate.'
+  end
+  LrDialogs.message('WildlifeAI', msg)
 end
 
 function M.hasAnalysis()
