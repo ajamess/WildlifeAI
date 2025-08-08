@@ -103,6 +103,8 @@ WildlifeAI revolutionizes your bird photography workflow by automatically:
 | **Quality Stacking** | Automatically stack similar photos by quality | ![Stacking](docs/images/stacking-small.png) |
 | **Crop Generation** | Auto-generate crops centered on detected birds | ![Crops](docs/images/crops-small.png) |
 
+A **Bracket Preview** dialog lets you review bracket analysis before stacking bracketed panoramas.
+
 ### **⚙️ Customization & Control**
 | Feature | Description | Screenshot |
 |---------|-------------|------------|
@@ -142,9 +144,12 @@ WildlifeAI revolutionizes your bird photography workflow by automatically:
 1. In Lightroom, go to **Library > Plug-in Extras**
 2. You should see **WildlifeAI menu items**:
    - WildlifeAI: Analyze Selected Photos
-   - WildlifeAI: Configure...
-   - WildlifeAI: Review Crops...
-   - And more!
+   - WildlifeAI: Analyze Brackets
+   - WildlifeAI: Stack Brackets
+   - WildlifeAI: Clear Bracket Analysis
+   - WildlifeAI: Configure…
+   - WildlifeAI: Review Crops…
+   - And more! (Bracket Preview appears before stacking when enabled)
 
 ![Menu Verification](docs/images/menu-verification.png)
 *↑ WildlifeAI menu items in Lightroom*
