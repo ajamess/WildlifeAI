@@ -28,6 +28,8 @@ local function setupDefaultPrefs()
   if prefs.enableBracketProcessing == nil then prefs.enableBracketProcessing = false end
   prefs.bracketGroupSize = prefs.bracketGroupSize or 3
   prefs.bracketStepEV    = prefs.bracketStepEV    or 1
+  prefs.bracketAnalysisDone = prefs.bracketAnalysisDone or false
+
   
   -- Per-photo processing options
   if prefs.perPhotoOutput == nil then prefs.perPhotoOutput = true end -- default enabled

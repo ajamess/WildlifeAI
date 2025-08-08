@@ -1,8 +1,12 @@
 local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
+local LrDialogs = import 'LrDialogs'
+local LrPrefs = import 'LrPrefs'
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 
 local M = {}
+local lastAnalysis = nil
+
 
 local DEFAULTS = {
   timeGap = 2, -- seconds between shots to be grouped
@@ -144,6 +148,38 @@ function M.applyStacks(groups, prefs)
     end
   end)
   Log.info('Stacking complete')
+end
+
+function M.analyze()
+  local catalog = LrApplication.activeCatalog()
+  local photos = catalog:getTargetPhotos()
+  if #photos == 0 then
+    LrDialogs.message('WildlifeAI', 'No photos selected')
+    return
+  end
+  lastAnalysis = M.analyzeBrackets(photos)
+  LrPrefs.prefsForPlugin().bracketAnalysisDone = true
+  LrDialogs.message('WildlifeAI', 'Bracket analysis complete.')
+end
+
+function M.hasAnalysis()
+  local prefs = LrPrefs.prefsForPlugin()
+  return prefs.bracketAnalysisDone == true and lastAnalysis ~= nil
+end
+
+function M.stack()
+  if not M.hasAnalysis() then
+    LrDialogs.message('WildlifeAI', 'Analyze brackets before stacking.')
+    return
+  end
+  M.applyStacks(lastAnalysis)
+  LrDialogs.message('WildlifeAI', 'Bracket stacking complete.')
+end
+
+function M.clear()
+  lastAnalysis = nil
+  LrPrefs.prefsForPlugin().bracketAnalysisDone = false
+  LrDialogs.message('WildlifeAI', 'Bracket analysis cleared.')
 end
 
 return M
