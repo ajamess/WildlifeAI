@@ -18,12 +18,17 @@ local function setupDefaultPrefs()
   
   -- Processing options
   prefs.enableStacking  = prefs.enableStacking  or false
-  prefs.bracketAnalysisDone = prefs.bracketAnalysisDone or false
   prefs.writeXMP        = prefs.writeXMP        or false
   prefs.mirrorJobId     = prefs.mirrorJobId     or false
   prefs.generateCrops   = prefs.generateCrops   ~= false -- default true
   prefs.useGPU          = prefs.useGPU          or false
   prefs.maxWorkers      = prefs.maxWorkers      or 4
+
+  -- Bracket processing options
+  if prefs.enableBracketProcessing == nil then prefs.enableBracketProcessing = false end
+  prefs.bracketGroupSize = prefs.bracketGroupSize or 3
+  prefs.bracketStepEV    = prefs.bracketStepEV    or 1
+  prefs.bracketAnalysisDone = prefs.bracketAnalysisDone or false
   
   -- Per-photo processing options
   if prefs.perPhotoOutput == nil then prefs.perPhotoOutput = true end -- default enabled
