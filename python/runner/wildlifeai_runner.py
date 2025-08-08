@@ -6,6 +6,7 @@ import logging
 import sys
 import os
 import time
+import threading
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -477,6 +478,8 @@ class EnhancedModelRunner:
         self.quality_classifier = None
         self.previous_image = None
         self.scene_count = self._load_global_scene_count()
+        # Shared lock to protect writes to shared resources
+        self._write_lock = threading.Lock()
         
         # Find the actual model directory
         self.model_dir = find_model_directory()
@@ -543,12 +546,26 @@ class EnhancedModelRunner:
         try:
             import tempfile
             scene_file = Path(tempfile.gettempdir()) / "wildlifeai_scene_count.txt"
-            
-            with open(scene_file, 'w') as f:
-                f.write(str(self.scene_count))
+            with self._write_lock:
+                with open(scene_file, 'w') as f:
+                    f.write(str(self.scene_count))
             logging.debug(f"Saved global scene count: {self.scene_count}")
         except Exception as e:
             logging.warning(f"Failed to save scene count: {e}")
+
+    def _safe_write_json(self, path: Path, data: Dict, retries: int = 3) -> bool:
+        """Safely write JSON data to disk with locking and retries."""
+        for attempt in range(1, retries + 1):
+            try:
+                with self._write_lock:
+                    with open(path, 'w') as f:
+                        json.dump(data, f, indent=2, default=str)
+                return True
+            except Exception as e:
+                logging.warning(f"Attempt {attempt} failed to write {path}: {e}")
+                time.sleep(0.1)
+        logging.error(f"All {retries} attempts failed to write {path}")
+        return False
 
     def _configure_tensorflow_gpu(self):
         """Configure TensorFlow GPU usage."""
@@ -820,12 +837,8 @@ class EnhancedModelRunner:
             "current_photo": "",
             "progress_percent": 0
         }
-        try:
-            with open(status_file, 'w') as f:
-                json.dump(status, f, indent=2)
+        if self._safe_write_json(status_file, status):
             logging.info(f"Created status file: {status_file}")
-        except Exception as e:
-            logging.warning(f"Failed to create status file: {e}")
         
         # Process sequentially to maintain scene counting state
         for i, photo_path in enumerate(photo_paths, 1):
@@ -835,23 +848,15 @@ class EnhancedModelRunner:
                 "current_photo": Path(photo_path).name,
                 "progress_percent": ((i - 1) / len(photo_paths)) * 100
             })
-            try:
-                with open(status_file, 'w') as f:
-                    json.dump(status, f, indent=2)
-            except Exception as e:
-                logging.warning(f"Failed to update status: {e}")
+            self._safe_write_json(status_file, status)
             
             try:
                 result = self.process_photo(photo_path, output_dir, generate_crops)
                 results.append(result)
                 
                 # Write incremental results after each photo
-                try:
-                    with open(results_file, 'w') as f:
-                        json.dump(results, f, indent=2, default=str)
+                if self._safe_write_json(results_file, results):
                     logging.debug(f"Updated results.json with {len(results)} results")
-                except Exception as e:
-                    logging.warning(f"Failed to write incremental results: {e}")
                 
                 # Update status after processing
                 status.update({
@@ -859,12 +864,8 @@ class EnhancedModelRunner:
                     "current_photo": Path(photo_path).name,
                     "progress_percent": (i / len(photo_paths)) * 100
                 })
-                try:
-                    with open(status_file, 'w') as f:
-                        json.dump(status, f, indent=2)
+                if self._safe_write_json(status_file, status):
                     logging.debug(f"Updated status: {i}/{len(photo_paths)} completed")
-                except Exception as e:
-                    logging.warning(f"Failed to update status after processing: {e}")
                 
                 if progress_callback:
                     progress_callback(i, len(photo_paths), Path(photo_path).name)
@@ -881,12 +882,8 @@ class EnhancedModelRunner:
                 results.append(error_result)
                 
                 # Write incremental results even for errors
-                try:
-                    with open(results_file, 'w') as f:
-                        json.dump(results, f, indent=2, default=str)
+                if self._safe_write_json(results_file, results):
                     logging.debug(f"Updated results.json with error result")
-                except Exception as e:
-                    logging.warning(f"Failed to write incremental error result: {e}")
                 
                 # Update status after error
                 status.update({
@@ -895,11 +892,7 @@ class EnhancedModelRunner:
                     "progress_percent": (i / len(photo_paths)) * 100,
                     "last_error": str(exc)
                 })
-                try:
-                    with open(status_file, 'w') as f:
-                        json.dump(status, f, indent=2)
-                except Exception as e:
-                    logging.warning(f"Failed to update status after error: {e}")
+                self._safe_write_json(status_file, status)
         
         # Write final completion status
         status.update({
@@ -909,12 +902,8 @@ class EnhancedModelRunner:
             "current_photo": "",
             "progress_percent": 100
         })
-        try:
-            with open(status_file, 'w') as f:
-                json.dump(status, f, indent=2)
+        if self._safe_write_json(status_file, status):
             logging.info(f"Processing completed - updated status file")
-        except Exception as e:
-            logging.warning(f"Failed to write final status: {e}")
         
         # Save the final scene count for persistence across runs
         self._save_global_scene_count()
@@ -1389,8 +1378,7 @@ def main():
                     "results": []
                 }
                 
-                with open(status_path, 'w') as f:
-                    json.dump(status, f, indent=2)
+                runner._safe_write_json(status_path, status)
                 
                 logging.info("Background processing started - loading models")
                 
@@ -1399,8 +1387,7 @@ def main():
                 
                 # Update status to processing
                 status["status"] = "processing"
-                with open(status_path, 'w') as f:
-                    json.dump(status, f, indent=2)
+                runner._safe_write_json(status_path, status)
                 
                 logging.info("Models loaded, starting photo processing")
                 
@@ -1409,8 +1396,7 @@ def main():
                     status["processed"] = current
                     status["current_photo"] = filename
                     status["progress_percent"] = (current / total) * 100
-                    with open(status_path, 'w') as f:
-                        json.dump(status, f, indent=2)
+                    runner._safe_write_json(status_path, status)
                     logging.info(f"Progress: {current}/{total} ({status['progress_percent']:.1f}%) - {filename}")
                 
                 start_time = time.time()
@@ -1425,13 +1411,11 @@ def main():
                 status["processed"] = len(results)
                 status["progress_percent"] = 100
                 
-                with open(status_path, 'w') as f:
-                    json.dump(status, f, indent=2)
+                runner._safe_write_json(status_path, status)
                 
                 # Save results
                 results_path = output_dir / "results.json"
-                with open(results_path, 'w') as f:
-                    json.dump(results, f, indent=2, default=str)
+                runner._safe_write_json(results_path, results)
                 
                 logging.info(f"Background processing complete: {len(results)} photos in {processing_time:.1f}s")
                 logging.info(f"Results saved to: {results_path}")
@@ -1444,8 +1428,7 @@ def main():
                         status["status"] = "error"
                         status["error"] = str(e)
                         status["end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                        with open(status_path, 'w') as f:
-                            json.dump(status, f, indent=2)
+                        runner._safe_write_json(status_path, status)
                     except Exception as e2:
                         logging.error(f"Failed to write error status: {e2}")
         
