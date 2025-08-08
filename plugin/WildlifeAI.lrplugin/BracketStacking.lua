@@ -62,41 +62,38 @@ local function getExposureValue(photo)
   return ev
 end
 
-local function getCaptureTime(photo)
-  local cache = getCacheEntry(photo)
-  if cache.captureTime then return cache.captureTime end
-  local ct = safeGetMetadata(photo, 'captureTime') or 0
-  cache.captureTime = ct
-  return ct
-end
-
-
 local function formatExposures(exposures)
   local t = {}
   for _,ev in ipairs(exposures) do
     t[#t+1] = string.format('%.2f', ev)
   end
   return table.concat(t, ', ')
+end
 
 local function getOrientation(photo)
   return safeGetMetadata(photo, 'orientation')
-
 end
 
--- Return capture time using original EXIF date/time field. Lightroom returns
--- either a numeric epoch value or a formatted string; convert both to seconds.
+-- Return capture time using original EXIF date/time field. Cache the result
+-- because metadata lookups are relatively expensive.
 local function getCaptureTime(photo)
+  local cache = getCacheEntry(photo)
+  if cache.captureTime then return cache.captureTime end
   local dt = safeGetMetadata(photo, 'dateTimeOriginal')
-  if type(dt) == 'number' then return dt end
-  if type(dt) == 'string' then
+  local ct = 0
+  if type(dt) == 'number' then
+    ct = dt
+  elseif type(dt) == 'string' then
     local y,mo,d,h,mi,s = dt:match('^(%d+):(%d+):(%d+) (%d+):(%d+):(%d+)')
     if y then
-      return os.time{year=tonumber(y), month=tonumber(mo), day=tonumber(d),
-                     hour=tonumber(h), min=tonumber(mi), sec=tonumber(s)}
+      ct = os.time{year=tonumber(y), month=tonumber(mo), day=tonumber(d),
+                   hour=tonumber(h), min=tonumber(mi), sec=tonumber(s)}
+    else
+      ct = tonumber(dt) or 0
     end
-    return tonumber(dt) or 0
   end
-  return 0
+  cache.captureTime = ct
+  return ct
 end
 
 -- Group photos by capture time
@@ -111,7 +108,8 @@ local function groupByTime(photos, prefs, progress)
   local lastCt, lastOr = nil, nil
   local gap = prefs.timeGap or DEFAULTS.timeGap
   local oTol = prefs.orientationTolerance or DEFAULTS.orientationTolerance -- orientation code tolerance (EXIF 1-8)
-  for _,p in ipairs(photos) do
+  local total = #photos
+  for idx,p in ipairs(photos) do
 
     local ct = getCaptureTime(p)
     local o = getOrientation(p)
@@ -150,8 +148,6 @@ local function groupByTime(photos, prefs, progress)
 
     lastCt = ct
     lastOr = o
-
-    last = ct
 
     -- Periodically update progress for large datasets
     if progress and idx % 50 == 0 then
@@ -239,46 +235,34 @@ function M.analyzeBrackets(photos, prefs, progress)
   end
   groups = mergeIncomplete(groups, prefs)
   local expected = prefs.expectedBracketSize or DEFAULTS.expectedBracketSize
-  for idx,g in ipairs(groups) do
-    classifyGroup(g, prefs)
-    if g.type=='bracket' then
-
-      local idxTop=1
-      local minDiff=nil
-      for i,ev in ipairs(g.exposures) do
-        local diff = math.abs(ev)
-        if not minDiff or diff < minDiff then
-          minDiff = diff
-          idxTop = i
-
-      if g.lowConfidence then
-        g.top = g.photos[1]
-      else
-        local idx=1
-        local minDiff=nil
-        for i,ev in ipairs(g.exposures) do
-          local diff = math.abs(ev)
-          if not minDiff or diff < minDiff then
-            minDiff = diff
-            idx = i
+    for idx,g in ipairs(groups) do
+      classifyGroup(g, prefs)
+      if g.type == 'bracket' then
+        if g.lowConfidence then
+          g.top = g.photos[1]
+        else
+          local idxTop = 1
+          local minDiff
+          for i,ev in ipairs(g.exposures) do
+            local diff = math.abs(ev)
+            if not minDiff or diff < minDiff then
+              minDiff = diff
+              idxTop = i
+            end
           end
-
+          g.top = g.photos[idxTop]
         end
-        g.top = g.photos[idx]
+      else
+        g.top = g.photos[1]
       end
-      g.top = g.photos[idxTop]
-
-    else
-      g.top = g.photos[1]
-    end
-    if prefs.bracketDebugMode then
-      Log.debug(string.format('Group %d exposures: %s', idx, formatExposures(g.exposures)))
-      if g.type == 'bracket' and #g.photos ~= expected then
-        Log.debug(string.format('Bracket size override: expected %d got %d', expected, #g.photos))
+      if prefs.bracketDebugMode then
+        Log.debug(string.format('Group %d exposures: %s', idx, formatExposures(g.exposures)))
+        if g.type == 'bracket' and #g.photos ~= expected then
+          Log.debug(string.format('Bracket size override: expected %d got %d', expected, #g.photos))
+        end
+        Log.debug(string.format('Group %d classified as %s (confidence %.2f)', idx, g.type, g.confidence or 0))
       end
-      Log.debug(string.format('Group %d classified as %s (confidence %.2f)', idx, g.type, g.confidence or 0))
     end
-  end
   Log.info('Bracket analysis produced '..#groups..' groups')
   return groups
 end
