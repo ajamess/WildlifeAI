@@ -830,6 +830,8 @@ class EnhancedModelRunner:
         except Exception as e:
             logging.warning(f"Failed to create status file: {e}")
 
+        file_lock = threading.Lock()
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_photo = {
                 executor.submit(self.process_photo, path, output_dir, generate_crops): path
@@ -849,16 +851,29 @@ class EnhancedModelRunner:
                         "quality": 0,
                         "error": str(exc)
                     }
-                results.append(result)
+                with file_lock:
+                    results.append(result)
+
+                    try:
+                        with open(results_file, 'w') as f:
+                            json.dump(results, f, indent=2, default=str)
+                        logging.debug(f"Updated results.json with {len(results)} results")
+                    except Exception as e:
+                        logging.warning(f"Failed to write results file: {e}")
+
+                    status.update({
+                        "processed": i,
+                        "current_photo": Path(photo_path).name,
+                        "progress_percent": (i / len(photo_paths)) * 100
+                    })
+                    try:
+                        with open(status_file, 'w') as f:
+                            json.dump(status, f, indent=2)
+                    except Exception as e:
+                        logging.warning(f"Failed to update status file: {e}")
+
                 if progress_callback:
                     progress_callback(i, len(photo_paths), Path(photo_path).name)
-
-        try:
-            with open(results_file, 'w') as f:
-                json.dump(results, f, indent=2, default=str)
-            logging.debug(f"Wrote results for {len(results)} photos")
-        except Exception as e:
-            logging.warning(f"Failed to write results file: {e}")
 
         status.update({
             "status": "completed",
@@ -870,7 +885,7 @@ class EnhancedModelRunner:
         try:
             with open(status_file, 'w') as f:
                 json.dump(status, f, indent=2)
-            logging.info(f"Processing completed - updated status file")
+            logging.info("Processing completed - updated status file")
         except Exception as e:
             logging.warning(f"Failed to write final status: {e}")
 
