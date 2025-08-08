@@ -480,6 +480,8 @@ class EnhancedModelRunner:
         self.scene_count = self._load_global_scene_count()
         # Shared lock to protect writes to shared resources
         self._write_lock = threading.Lock()
+        # Lock to protect scene counting and previous image access
+        self._state_lock = threading.Lock()
         
         # Find the actual model directory
         self.model_dir = find_model_directory()
@@ -636,12 +638,13 @@ class EnhancedModelRunner:
                 }
             
             # Compute similarity with previous image for scene detection
-            similarity = compute_image_similarity_akaze(self.previous_image, img)
-            if not similarity['similar']:
-                self.scene_count += 1
-                
-            # Update previous_image for next iteration
-            self.previous_image = img.copy()
+            with self._state_lock:
+                similarity = compute_image_similarity_akaze(self.previous_image, img)
+                if not similarity['similar']:
+                    self.scene_count += 1
+
+                # Update previous_image for next iteration
+                self.previous_image = img.copy()
             
             # Get predictions from Mask-RCNN
             if not self.mask_rcnn or self.mask_rcnn.model is None:
@@ -821,14 +824,18 @@ class EnhancedModelRunner:
         
         return result
 
-    def process_batch(self, photo_paths: List[str], output_dir: Path, 
+    def process_batch(self, photo_paths: List[str], output_dir: Path,
                      generate_crops: bool = True, progress_callback: Optional[callable] = None) -> List[Dict]:
-        """Process multiple photos sequentially to maintain scene counting."""
-        results = []
+        """Process multiple photos using a thread pool.
+
+        Scene counting and previous-image comparisons are protected by a lock to
+        keep state consistent. For deterministic scene counting, run with
+        ``max_workers=1``.
+        """
+        results: List[Optional[Dict]] = [None] * len(photo_paths)
         results_file = output_dir / "results.json"
         status_file = output_dir / "status.json"
-        
-        # Write initial status
+
         status = {
             "status": "processing",
             "start_time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -837,64 +844,47 @@ class EnhancedModelRunner:
             "current_photo": "",
             "progress_percent": 0
         }
-        if self._safe_write_json(status_file, status):
-            logging.info(f"Created status file: {status_file}")
-        
-        # Process sequentially to maintain scene counting state
-        for i, photo_path in enumerate(photo_paths, 1):
-            # Update status before processing
-            status.update({
-                "processed": i - 1,
-                "current_photo": Path(photo_path).name,
-                "progress_percent": ((i - 1) / len(photo_paths)) * 100
-            })
-            self._safe_write_json(status_file, status)
-            
+        self._safe_write_json(status_file, status)
+
+        processed = 0
+
+        def worker(idx: int, path: str):
             try:
-                result = self.process_photo(photo_path, output_dir, generate_crops)
-                results.append(result)
-                
-                # Write incremental results after each photo
-                if self._safe_write_json(results_file, results):
-                    logging.debug(f"Updated results.json with {len(results)} results")
-                
-                # Update status after processing
-                status.update({
-                    "processed": i,
-                    "current_photo": Path(photo_path).name,
-                    "progress_percent": (i / len(photo_paths)) * 100
-                })
-                if self._safe_write_json(status_file, status):
-                    logging.debug(f"Updated status: {i}/{len(photo_paths)} completed")
-                
-                if progress_callback:
-                    progress_callback(i, len(photo_paths), Path(photo_path).name)
-                        
+                return idx, self.process_photo(path, output_dir, generate_crops)
             except Exception as exc:
-                logging.error(f"Failed to process {photo_path}: {exc}")
-                error_result = {
-                    "filename": Path(photo_path).name,
+                logging.error(f"Failed to process {path}: {exc}")
+                return idx, {
+                    "filename": Path(path).name,
                     "species": "Unknown",
                     "species_confidence": 0,
                     "quality": 0,
                     "error": str(exc)
                 }
-                results.append(error_result)
-                
-                # Write incremental results even for errors
-                if self._safe_write_json(results_file, results):
-                    logging.debug(f"Updated results.json with error result")
-                
-                # Update status after error
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_index = {
+                executor.submit(worker, idx, path): idx
+                for idx, path in enumerate(photo_paths)
+            }
+            for future in as_completed(future_to_index):
+                idx, result = future.result()
+                results[idx] = result
+                processed += 1
+
+                # Write incremental results and status
+                self._safe_write_json(results_file, [r for r in results if r])
+                photo_path = photo_paths[idx]
                 status.update({
-                    "processed": i,
+                    "processed": processed,
                     "current_photo": Path(photo_path).name,
-                    "progress_percent": (i / len(photo_paths)) * 100,
-                    "last_error": str(exc)
+                    "progress_percent": (processed / len(photo_paths)) * 100
                 })
                 self._safe_write_json(status_file, status)
-        
-        # Write final completion status
+
+                if progress_callback:
+                    progress_callback(processed, len(photo_paths), Path(photo_path).name)
+
+        # Final completion status
         status.update({
             "status": "completed",
             "end_time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -902,13 +892,12 @@ class EnhancedModelRunner:
             "current_photo": "",
             "progress_percent": 100
         })
-        if self._safe_write_json(status_file, status):
-            logging.info(f"Processing completed - updated status file")
-        
+        self._safe_write_json(status_file, status)
+
         # Save the final scene count for persistence across runs
         self._save_global_scene_count()
-        
-        return results
+
+        return [r for r in results if r]
 
     def load_expected_results_from_csv(self, csv_path: str) -> Dict[str, Dict]:
         """Load expected results from CSV for regression testing."""

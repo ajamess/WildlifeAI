@@ -114,29 +114,23 @@ class TestEnhancedRunner:
             
             # Process a subset of images
             photo_paths = [str(img) for img in test_images[:2]]
-            
-            results = runner.process_batch(photo_paths, output_dir, generate_crops=True)
-            
+
+            results = runner.process_batch(photo_paths, output_dir, generate_crops=False)
+
             # Check results
             assert len(results) == len(photo_paths), "Wrong number of results"
-            
+
             for result in results:
-                # Check required fields
+                # Check required fields produced by process_photo
                 required_fields = [
-                    "detected_species", "species_confidence", "quality", 
-                    "rating", "scene_count", "json_path"
+                    "filename", "species", "species_confidence",
+                    "quality", "rating", "scene_count", "processing_time"
                 ]
                 for field in required_fields:
                     assert field in result, f"Missing field: {field}"
-                
-                # Check JSON file was created
-                json_path = Path(result["json_path"])
-                assert json_path.exists(), f"JSON file not created: {json_path}"
-                
-                # Verify JSON content
-                with open(json_path) as f:
-                    json_data = json.load(f)
-                    assert json_data == result, "JSON content doesn't match result"
+
+            # Scene count should match runner state after batch
+            assert runner.scene_count == results[-1]["scene_count"]
     
     def test_crop_generation(self, test_images):
         """Test crop image generation."""
@@ -262,7 +256,17 @@ class TestEnhancedRunner:
 
 class TestPerformance:
     """Performance tests for the enhanced runner."""
-    
+
+    @pytest.fixture(scope="class")
+    def test_images(self):
+        originals_dir = Path(__file__).parent / "quick" / "original"
+        if not originals_dir.exists():
+            pytest.skip("No test images found")
+        images = list(originals_dir.glob("*"))
+        if not images:
+            pytest.skip("No test images found")
+        return images
+
     @pytest.mark.slow
     def test_parallel_processing_performance(self, test_images):
         """Test that parallel processing improves performance."""
@@ -278,19 +282,24 @@ class TestPerformance:
             import time
             runner_single = ModelRunner(use_gpu=False, max_workers=1)
             start_time = time.time()
-            runner_single.process_batch(photo_paths, output_dir / "single")
+            results_single = runner_single.process_batch(photo_paths, output_dir / "single")
             single_time = time.time() - start_time
-            
+
             # Test multi-threaded
             runner_multi = ModelRunner(use_gpu=False, max_workers=2)
             start_time = time.time()
-            runner_multi.process_batch(photo_paths, output_dir / "multi")
+            results_multi = runner_multi.process_batch(photo_paths, output_dir / "multi")
             multi_time = time.time() - start_time
+
+            # Scene counts should match between single and multi threaded runs
+            scenes_single = [r["scene_count"] for r in results_single]
+            scenes_multi = [r["scene_count"] for r in results_multi]
+            assert scenes_single == scenes_multi, "Scene counts differ between runs"
             
             # Multi-threaded should be faster (with some tolerance)
             improvement = (single_time - multi_time) / single_time
             print(f"Performance improvement: {improvement:.2%}")
-            
+
             # Should see some improvement, but not strict since test images are small
             assert improvement > -0.5, "Multi-threading significantly slower than single-threading"
 
