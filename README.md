@@ -594,6 +594,7 @@ The WildlifeAI codebase is thoroughly documented across multiple modules:
 - **[`scripts/freeze_wildlifeai_win.bat`](docs/code/build-windows.md)** - Windows executable compilation, dependency bundling
 - **[`scripts/freeze_mac.sh`](docs/code/build-mac.md)** - macOS universal binary creation, code signing
 - **[`scripts/package_plugin.py`](docs/code/package-plugin.md)** - Cross-platform plugin packaging, distribution prep
+- **`scripts/build_and_test.sh`** – Sets up a virtual environment, installs dependencies (including TensorFlow 2.18), builds the PyInstaller runner, and runs the test suite (`scripts\build_and_test.bat` on Windows)
 
 #### **🧪 Testing Framework**
 - **[`tests/test_enhanced_runner.py`](docs/code/test-enhanced-runner.md)** - AI model validation, accuracy testing
