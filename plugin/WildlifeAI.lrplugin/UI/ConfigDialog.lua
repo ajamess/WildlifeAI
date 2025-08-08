@@ -3,6 +3,9 @@ local LrDialogs = import 'LrDialogs'
 local LrView = import 'LrView'
 local LrPrefs = import 'LrPrefs'
 local LrBinding = import 'LrBinding'
+local LrFileUtils = import 'LrFileUtils'
+local LrPathUtils = import 'LrPathUtils'
+local json = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/dkjson.lua') )
 
 -- Get system CPU count for max workers limit
 local function getSystemCPUCount()
@@ -83,6 +86,40 @@ return function(context)
   local prefs = LrPrefs.prefsForPlugin()
   local bind = LrView.bind
   local maxCPUs = getSystemCPUCount()
+
+  local function exportPrefs()
+    local file = LrDialogs.runSavePanel {
+      title = 'Export WildlifeAI Settings',
+      requiredFileType = 'json'
+    }
+    if file then
+      local encoded = json.encode(prefs, { indent = true })
+      LrFileUtils.writeFile(file, encoded)
+      LrDialogs.message('Export Complete', 'Settings exported to:\n' .. file, 'info')
+    end
+  end
+
+  local function importPrefs()
+    local files = LrDialogs.runOpenPanel {
+      title = 'Import WildlifeAI Settings',
+      canChooseFiles = true,
+      allowsMultipleSelection = false,
+      fileTypes = { 'json' }
+    }
+    local file = files and files[1]
+    if file and LrFileUtils.exists(file) then
+      local contents = LrFileUtils.readFile(file)
+      local data = json.decode(contents)
+      if type(data) == 'table' then
+        for k, v in pairs(data) do
+          prefs[k] = v
+        end
+        LrDialogs.message('Import Complete', 'Settings imported from:\n' .. file, 'info')
+      else
+        LrDialogs.message('Import Failed', 'Invalid settings file', 'error')
+      end
+    end
+  end
   
   -- Set defaults
   prefs.maxWorkers = prefs.maxWorkers or math.min(4, maxCPUs)
@@ -1079,6 +1116,20 @@ return function(context)
       spacing = 15,
       leftColumn,
       rightColumn
+    },
+
+    f:spacer { height = 10 },
+
+    f:row {
+      spacing = f:control_spacing(),
+      f:push_button {
+        title = 'Import Settings…',
+        action = importPrefs
+      },
+      f:push_button {
+        title = 'Export Settings…',
+        action = exportPrefs
+      }
     }
   }
   
