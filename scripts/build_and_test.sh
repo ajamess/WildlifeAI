@@ -17,7 +17,7 @@ source venv/bin/activate
 pip install --upgrade pip >/dev/null
 # onnxruntime-directml is Windows-specific; skip if unavailable
 grep -v onnxruntime-directml python/runner/requirements.txt > "$ROOT_DIR/requirements.tmp"
-pip install -r "$ROOT_DIR/requirements.tmp" pyinstaller >/dev/null
+pip install --upgrade -r "$ROOT_DIR/requirements.tmp" pyinstaller >/dev/null
 pyinstaller python/runner/wai_runner.py --onefile --name kestrel_runner >/dev/null
 
 # Package plugin with built runner
