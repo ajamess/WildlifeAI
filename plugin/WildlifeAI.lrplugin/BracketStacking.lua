@@ -7,6 +7,7 @@ local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local M = {}
 local lastAnalysis = nil
 
+
 local DEFAULTS = {
   timeGap = 2, -- seconds between shots to be grouped
   exposureTolerance = 0.1, -- EV difference treated as same exposure

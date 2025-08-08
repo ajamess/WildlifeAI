@@ -3,6 +3,9 @@ local LrDialogs = import 'LrDialogs'
 local LrView = import 'LrView'
 local LrPrefs = import 'LrPrefs'
 local LrBinding = import 'LrBinding'
+local LrFileUtils = import 'LrFileUtils'
+local LrPathUtils = import 'LrPathUtils'
+local json = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/dkjson.lua') )
 
 -- Get system CPU count for max workers limit
 local function getSystemCPUCount()
@@ -83,6 +86,40 @@ return function(context)
   local prefs = LrPrefs.prefsForPlugin()
   local bind = LrView.bind
   local maxCPUs = getSystemCPUCount()
+
+  local function exportPrefs()
+    local file = LrDialogs.runSavePanel {
+      title = 'Export WildlifeAI Settings',
+      requiredFileType = 'json'
+    }
+    if file then
+      local encoded = json.encode(prefs, { indent = true })
+      LrFileUtils.writeFile(file, encoded)
+      LrDialogs.message('Export Complete', 'Settings exported to:\n' .. file, 'info')
+    end
+  end
+
+  local function importPrefs()
+    local files = LrDialogs.runOpenPanel {
+      title = 'Import WildlifeAI Settings',
+      canChooseFiles = true,
+      allowsMultipleSelection = false,
+      fileTypes = { 'json' }
+    }
+    local file = files and files[1]
+    if file and LrFileUtils.exists(file) then
+      local contents = LrFileUtils.readFile(file)
+      local data = json.decode(contents)
+      if type(data) == 'table' then
+        for k, v in pairs(data) do
+          prefs[k] = v
+        end
+        LrDialogs.message('Import Complete', 'Settings imported from:\n' .. file, 'info')
+      else
+        LrDialogs.message('Import Failed', 'Invalid settings file', 'error')
+      end
+    end
+  end
   
   -- Set defaults
   prefs.maxWorkers = prefs.maxWorkers or math.min(4, maxCPUs)
@@ -166,7 +203,23 @@ return function(context)
   if prefs.keywordSceneCount == nil then prefs.keywordSceneCount = true end
   if prefs.keywordDetectedSpecies == nil then prefs.keywordDetectedSpecies = true end
   if prefs.keywordSpeciesUnderSpeciesRoot == nil then prefs.keywordSpeciesUnderSpeciesRoot = false end
-  
+
+  -- Bracket stacking defaults
+  if prefs.enableBracketStacking == nil then prefs.enableBracketStacking = false end
+  prefs.defaultBracketSize = prefs.defaultBracketSize or 3
+  prefs.customBracketSize = prefs.customBracketSize or 3
+  prefs.withinBracketInterval = prefs.withinBracketInterval or 2
+  prefs.betweenBracketInterval = prefs.betweenBracketInterval or 10
+  if prefs.matchExposureSettings == nil then prefs.matchExposureSettings = true end
+  prefs.exposureEvTolerance = prefs.exposureEvTolerance or 1.0
+  if prefs.enablePanoramaDetection == nil then prefs.enablePanoramaDetection = false end
+  prefs.panoramaMinFrames = prefs.panoramaMinFrames or 3
+  prefs.panoramaInterval = prefs.panoramaInterval or 5
+  if prefs.collapseBracketStacks == nil then prefs.collapseBracketStacks = true end
+  if prefs.middleExposureOnTop == nil then prefs.middleExposureOnTop = true end
+  if prefs.showBracketPreview == nil then prefs.showBracketPreview = false end
+  prefs.previewDelay = prefs.previewDelay or 0
+
   -- Create validation properties with proper function context
   local props = LrBinding.makePropertyTable(context)
   props.validationError = ''
@@ -1060,18 +1113,226 @@ return function(context)
       }
     }
   }
-  
-  -- Main dialog content with two-column layout
+  -- General settings tab (existing content)
+  local generalTab = f:row {
+    spacing = 15,
+    leftColumn,
+    rightColumn
+  }
+
+  -- Bracket stacking tab
+  local bracketTab = f:column {
+    spacing = f:control_spacing(),
+
+    f:group_box {
+      title = 'Basic Settings',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:checkbox {
+        title = 'Enable automatic bracket stacking',
+        value = bind('enableBracketStacking')
+      },
+
+      f:spacer { height = 5 },
+
+      f:row {
+        f:static_text {
+          title = 'Default bracket size:',
+          width = 150,
+          alignment = 'right'
+        },
+        f:popup_menu {
+          value = bind('defaultBracketSize'),
+          items = {
+            { title = '3', value = 3 },
+            { title = '5', value = 5 },
+            { title = '7', value = 7 },
+            { title = 'Custom', value = 'custom' }
+          },
+          immediate = true,
+          width = 80
+        },
+        f:edit_field {
+          value = bind('customBracketSize'),
+          width_in_chars = 6,
+          enabled = bind {
+            key = 'defaultBracketSize',
+            transform = function(value) return value == 'custom' end
+          }
+        }
+      }
+    },
+
+    f:spacer { height = 10 },
+
+    f:group_box {
+      title = 'Time Thresholds',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:row {
+        f:static_text {
+          title = 'Within bracket (sec):',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('withinBracketInterval'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      },
+
+      f:row {
+        f:static_text {
+          title = 'Between brackets (sec):',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('betweenBracketInterval'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      }
+    },
+
+    f:spacer { height = 10 },
+
+    f:group_box {
+      title = 'Exposure Analysis',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:checkbox {
+        title = 'Match exposure settings',
+        value = bind('matchExposureSettings')
+      },
+
+      f:row {
+        f:static_text {
+          title = 'EV tolerance:',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('exposureEvTolerance'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      }
+    },
+
+    f:spacer { height = 10 },
+
+    f:group_box {
+      title = 'Panorama Detection',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:checkbox {
+        title = 'Detect panoramas',
+        value = bind('enablePanoramaDetection')
+      },
+
+      f:row {
+        enabled = bind('enablePanoramaDetection'),
+        f:static_text {
+          title = 'Minimum frames:',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('panoramaMinFrames'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      },
+
+      f:row {
+        enabled = bind('enablePanoramaDetection'),
+        f:static_text {
+          title = 'Max gap (sec):',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('panoramaInterval'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      }
+    },
+
+    f:spacer { height = 10 },
+
+    f:group_box {
+      title = 'Stack Behavior',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:checkbox {
+        title = 'Collapse stacks after creation',
+        value = bind('collapseBracketStacks')
+      },
+
+      f:checkbox {
+        title = 'Put middle exposure on top',
+        value = bind('middleExposureOnTop')
+      }
+    },
+
+    f:spacer { height = 10 },
+
+    f:group_box {
+      title = 'Preview',
+      fill_horizontal = 1,
+      spacing = f:control_spacing(),
+
+      f:checkbox {
+        title = 'Show preview before stacking',
+        value = bind('showBracketPreview')
+      },
+
+      f:row {
+        enabled = bind('showBracketPreview'),
+        f:static_text {
+          title = 'Preview delay (sec):',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('previewDelay'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      }
+    }
+  }
+
+  local tabView = f:tab_view {
+    f:tab_view_item {
+      title = 'General',
+      generalTab
+    },
+    f:tab_view_item {
+      title = 'Bracket Stacking',
+      bracketTab
+    }
+  }
+
+  -- Main dialog content
   local c = f:column {
     bind_to_object = prefs,
     spacing = f:control_spacing(),
-    
-    f:static_text { 
-      title = 'WildlifeAI Configuration', 
+
+    f:static_text {
+      title = 'WildlifeAI Configuration',
       font = '<system/bold>',
-      fill_horizontal = 1 
+      fill_horizontal = 1
     },
-    
+
     f:spacer { height = 10 },
     
     -- Two-column layout
@@ -1079,7 +1340,23 @@ return function(context)
       spacing = 15,
       leftColumn,
       rightColumn
+    },
+
+    f:spacer { height = 10 },
+
+    f:row {
+      spacing = f:control_spacing(),
+      f:push_button {
+        title = 'Import Settings…',
+        action = importPrefs
+      },
+      f:push_button {
+        title = 'Export Settings…',
+        action = exportPrefs
+      }
     }
+
+    tabView
   }
   
   -- Initial validation
