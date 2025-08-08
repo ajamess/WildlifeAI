@@ -1177,7 +1177,12 @@ def main():
     parser.add_argument("photos", nargs="*", help="Photo paths to process")
     parser.add_argument("--photo-list", help="Path to file containing list of photos")
     parser.add_argument("--output-dir", help="Output directory for results")
-    parser.add_argument("--max-workers", type=int, default=4, help="Maximum worker threads")
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=os.cpu_count() or 1,
+        help="Maximum worker threads (cannot exceed CPU threads)",
+    )
     parser.add_argument("--gpu", action="store_true", help="Enable GPU acceleration")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--generate-crops", action="store_true", help="Generate crop images")
@@ -1206,6 +1211,9 @@ def main():
             except:
                 pass
         raise
+
+    cpu_threads = os.cpu_count() or 1
+    args.max_workers = max(1, min(args.max_workers, cpu_threads))
     
     # Handle debug environment mode first
     if args.debug_env:
@@ -1299,7 +1307,9 @@ def main():
     
     logging.info("Enhanced WildlifeAI Runner starting")
     logging.info(f"GPU enabled: {args.gpu}")
-    logging.info(f"Max workers: {args.max_workers}")
+    logging.info(
+        f"Worker threads: {args.max_workers} (CPU threads available: {cpu_threads})"
+    )
     
     # Process photo paths first (needed for both sync and async modes)
     photo_paths = []
