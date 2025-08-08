@@ -18,7 +18,16 @@ return {
     { title='WildlifeAI: Statistics and Analytics…', file='Menu/Analytics.lua' },
     { title='WildlifeAI: Stack Based on Scene and Quality…', file='Menu/StackBySceneAndQuality.lua', enabledWhen='photosSelected' },
     { title='WildlifeAI: Analyze Brackets', file='Menu/AnalyzeBrackets.lua', enabledWhen='photosSelected' },
-    { title='WildlifeAI: Stack Brackets', file='Menu/StackBrackets.lua', enabledWhen='photosSelected' },
+    {
+      title='WildlifeAI: Stack Brackets',
+      file='Menu/StackBrackets.lua',
+      enabledWhen='photosSelected',
+      enabled=function()
+        local LrPrefs = import 'LrPrefs'
+        local prefs = LrPrefs.prefsForPlugin()
+        return prefs.bracketAnalysisDone == true
+      end,
+    },
     { title='WildlifeAI: Clear Bracket Analysis', file='Menu/ClearBracketAnalysis.lua' },
     { title='WildlifeAI: Toggle Logging',         file='Menu/ToggleLogging.lua' },
     { title='WildlifeAI: Toggle Debug Mode',      file='Menu/ToggleDebug.lua' },
@@ -35,7 +44,16 @@ return {
     { title='WildlifeAI: Statistics and Analytics…', file='Menu/Analytics.lua' },
     { title='WildlifeAI: Stack Based on Scene and Quality…', file='Menu/StackBySceneAndQuality.lua', enabledWhen='photosSelected' },
     { title='WildlifeAI: Analyze Brackets', file='Menu/AnalyzeBrackets.lua', enabledWhen='photosSelected' },
-    { title='WildlifeAI: Stack Brackets', file='Menu/StackBrackets.lua', enabledWhen='photosSelected' },
+    {
+      title='WildlifeAI: Stack Brackets',
+      file='Menu/StackBrackets.lua',
+      enabledWhen='photosSelected',
+      enabled=function()
+        local LrPrefs = import 'LrPrefs'
+        local prefs = LrPrefs.prefsForPlugin()
+        return prefs.bracketAnalysisDone == true
+      end,
+    },
     { title='WildlifeAI: Clear Bracket Analysis', file='Menu/ClearBracketAnalysis.lua' },
     { title='WildlifeAI: Toggle Logging',         file='Menu/ToggleLogging.lua' },
     { title='WildlifeAI: Toggle Debug Mode',      file='Menu/ToggleDebug.lua' },
