@@ -21,15 +21,17 @@ default paths are:
 - Windows: `bin/win/kestrel_runner.exe`
 - macOS: `bin/mac/kestrel_runner`
 
-## Running Analysis
+## Detection Workflow
 
 1. Select photos in the Library module.
-2. Choose **Library > Plug‑in Extras > WildlifeAI: Analyze Selected Photos**.
-3. Progress is shown while the runner processes the images. JSON files are
+2. For standard shots choose **Library > Plug‑in Extras > WildlifeAI: Analyze Selected Photos**.
+3. For exposure brackets run **WildlifeAI: Analyze Brackets** before stacking.
+4. Enable *Show preview before stacking* in the configuration dialog to review results in the **Bracket Preview** when using **WildlifeAI: Stack Brackets**.
+5. Progress is shown while the runner processes the images. JSON files are
    written alongside the originals when possible or in `Pictures/.kestrel`.
-4. After completion new metadata fields are populated. Enable the *WildlifeAI*
+6. After completion new metadata fields are populated. Enable the *WildlifeAI*
    tagset from the Metadata panel to view them.
-5. Smart collections named *WildlifeAI: Quality ≥ 90* and *WildlifeAI: Low
+7. Smart collections named *WildlifeAI: Quality ≥ 90* and *WildlifeAI: Low
    Confidence ≤ 50* are created automatically for quick access.
 
 ## Reviewing Crops
@@ -43,6 +45,18 @@ Keywords can be applied based on detected species, quality bucket and confidence
 level. Photo stacks can be created per scene count via **WildlifeAI: Stack by
 Scene Count**.
 
+## Best Practices for Bracketed Panoramas
+
+- Mount the camera on a sturdy tripod and use manual exposure for all frames.
+- Maintain 30‑50% overlap between images and keep bracket groups in order.
+- Lock white balance and focus to avoid variations across the panorama.
+
+## Performance Tips
+
+- Set an appropriate **Max Workers** value in the configuration dialog to match your CPU cores.
+- Disable preview or reduce the delay if stacking feels slow.
+- Close other heavy applications while running large batches.
+
 ## Logs and Troubleshooting
 
 - Enable or disable logging from the configuration dialog or via
@@ -51,4 +65,5 @@ Scene Count**.
   `wildlifeai.log`.
 - If the plug‑in reports that the runner is missing, verify the paths in the
   configuration dialog or rebuild the plug‑in.
+- When stack results look incorrect, rerun **Analyze Brackets** and confirm settings in the **Bracket Preview** dialog.
 
