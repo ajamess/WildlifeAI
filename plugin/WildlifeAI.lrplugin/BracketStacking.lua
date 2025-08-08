@@ -13,6 +13,7 @@ local DEFAULTS = {
   exposureTolerance = 0.1, -- EV difference treated as same exposure
   expectedBracketSize = 3,
   collapseStacks = true,
+  bracketDebugMode = false,
 }
 
 local function parseNumber(v)
@@ -44,8 +45,17 @@ local function getExposureValue(photo)
   return ev
 end
 
+
+local function formatExposures(exposures)
+  local t = {}
+  for _,ev in ipairs(exposures) do
+    t[#t+1] = string.format('%.2f', ev)
+  end
+  return table.concat(t, ', ')
+
 local function getOrientation(photo)
   return safeGetMetadata(photo, 'orientation')
+
 end
 
 -- Group photos by capture time
@@ -57,7 +67,12 @@ local function groupByTime(photos, prefs)
   local cur, last = nil, nil
   local gap = prefs.timeGap or DEFAULTS.timeGap
   for _,p in ipairs(photos) do
+
     local ct = safeGetMetadata(p, 'captureTime') or 0
+    if last and prefs.bracketDebugMode then
+      Log.debug(string.format('Time gap to previous: %.2fs', ct - last))
+    end
+
     if not last or (ct - last) <= gap then
       if not cur then cur = {photos={}, exposures={}, orientations={}, lowConfidence=false} end
       table.insert(cur.photos, p)
@@ -74,6 +89,9 @@ local function groupByTime(photos, prefs)
       end
       table.insert(cur.orientations, o)
     else
+      if prefs.bracketDebugMode then
+        Log.debug(string.format('Gap %.2fs exceeds %.2fs, starting new group', ct - last, gap))
+      end
       table.insert(groups, cur)
       cur = {photos={p}, exposures={}, orientations={}, lowConfidence=false}
       local ev = getExposureValue(p)
@@ -108,12 +126,16 @@ local function classifyGroup(g, prefs)
   end
   local count = 0
   for _ in pairs(unique) do count = count + 1 end
+  local expected = prefs.expectedBracketSize or DEFAULTS.expectedBracketSize
   if count > 1 then
     g.type = 'bracket'
+    g.confidence = math.min(count / expected, 1)
   elseif #g.photos > 1 then
     g.type = 'panorama'
+    g.confidence = 1
   else
     g.type = 'single'
+    g.confidence = 1
   end
 end
 
@@ -126,6 +148,9 @@ local function mergeIncomplete(groups, prefs)
     local g = groups[i]
     if g.type=='bracket' and #g.photos < expected and groups[i+1] and groups[i+1].type=='bracket' then
       local nxt = groups[i+1]
+      if prefs.bracketDebugMode then
+        Log.debug(string.format('Merging bracket groups of sizes %d and %d (expected %d)', #g.photos, #nxt.photos, expected))
+      end
       for _,p in ipairs(nxt.photos) do table.insert(g.photos, p) end
       for _,ev in ipairs(nxt.exposures) do table.insert(g.exposures, ev) end
       classifyGroup(g, prefs)
@@ -141,12 +166,28 @@ function M.analyzeBrackets(photos, prefs)
   prefs = prefs or {}
   for k,v in pairs(DEFAULTS) do if prefs[k] == nil then prefs[k] = v end end
   Log.info('Analyzing brackets for '..#photos..' photos')
+  if prefs.bracketDebugMode then
+    Log.debug('Bracket debug mode enabled')
+    if prefs.expectedBracketSize ~= DEFAULTS.expectedBracketSize then
+      Log.debug('Bracket size override preference: '..tostring(prefs.expectedBracketSize))
+    end
+  end
   local groups = groupByTime(photos, prefs)
   for _,g in ipairs(groups) do classifyGroup(g, prefs) end
   groups = mergeIncomplete(groups, prefs)
-  for _,g in ipairs(groups) do
+  local expected = prefs.expectedBracketSize or DEFAULTS.expectedBracketSize
+  for idx,g in ipairs(groups) do
     classifyGroup(g, prefs)
     if g.type=='bracket' then
+
+      local idxTop=1
+      local minDiff=nil
+      for i,ev in ipairs(g.exposures) do
+        local diff = math.abs(ev)
+        if not minDiff or diff < minDiff then
+          minDiff = diff
+          idxTop = i
+
       if g.lowConfidence then
         g.top = g.photos[1]
       else
@@ -158,11 +199,21 @@ function M.analyzeBrackets(photos, prefs)
             minDiff = diff
             idx = i
           end
+
         end
         g.top = g.photos[idx]
       end
+      g.top = g.photos[idxTop]
+
     else
       g.top = g.photos[1]
+    end
+    if prefs.bracketDebugMode then
+      Log.debug(string.format('Group %d exposures: %s', idx, formatExposures(g.exposures)))
+      if g.type == 'bracket' and #g.photos ~= expected then
+        Log.debug(string.format('Bracket size override: expected %d got %d', expected, #g.photos))
+      end
+      Log.debug(string.format('Group %d classified as %s (confidence %.2f)', idx, g.type, g.confidence or 0))
     end
   end
   Log.info('Bracket analysis produced '..#groups..' groups')
@@ -202,7 +253,8 @@ function M.analyze()
     LrDialogs.message('WildlifeAI', 'No photos selected')
     return
   end
-  lastAnalysis = M.analyzeBrackets(photos)
+  local prefs = LrPrefs.prefsForPlugin()
+  lastAnalysis = M.analyzeBrackets(photos, prefs)
   LrPrefs.prefsForPlugin().bracketAnalysisDone = true
   local low = 0
   for _,g in ipairs(lastAnalysis) do if g.lowConfidence then low = low + 1 end end
