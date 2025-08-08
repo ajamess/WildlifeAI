@@ -2,6 +2,8 @@ local LrApplication = import 'LrApplication'
 local LrPathUtils = import 'LrPathUtils'
 local LrDialogs = import 'LrDialogs'
 local LrPrefs = import 'LrPrefs'
+local LrTasks = import 'LrTasks'
+local LrProgressScope = import 'LrProgressScope'
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 
 local M = {}
@@ -36,13 +38,33 @@ local function safeGetMetadata(photo, field)
   return value
 end
 
+-- Cache metadata that is expensive to retrieve repeatedly
+local metadataCache = {}
+
+local function getCacheEntry(photo)
+  local id = photo.localIdentifier or safeGetMetadata(photo, 'localIdentifier') or tostring(photo)
+  metadataCache[id] = metadataCache[id] or {}
+  return metadataCache[id]
+end
+
 local function getExposureValue(photo)
+  local cache = getCacheEntry(photo)
+  if cache.exposure then return cache.exposure end
   local shutter = parseNumber(safeGetMetadata(photo, 'shutterSpeed'))
   local aperture = parseNumber(safeGetMetadata(photo, 'aperture'))
   local iso = parseNumber(safeGetMetadata(photo, 'isoSpeedRating'))
   if shutter <= 0 or aperture <= 0 or iso <= 0 then return nil end
   local ev = math.log(aperture * aperture / shutter * 100 / iso, 2)
+  cache.exposure = ev
   return ev
+end
+
+local function getCaptureTime(photo)
+  local cache = getCacheEntry(photo)
+  if cache.captureTime then return cache.captureTime end
+  local ct = safeGetMetadata(photo, 'captureTime') or 0
+  cache.captureTime = ct
+  return ct
 end
 
 
@@ -59,16 +81,17 @@ local function getOrientation(photo)
 end
 
 -- Group photos by capture time
-local function groupByTime(photos, prefs)
+local function groupByTime(photos, prefs, progress)
   table.sort(photos, function(a,b)
-    return (safeGetMetadata(a, 'captureTime') or 0) < (safeGetMetadata(b, 'captureTime') or 0)
+    return (getCaptureTime(a) or 0) < (getCaptureTime(b) or 0)
   end)
   local groups = {}
   local cur, last = nil, nil
   local gap = prefs.timeGap or DEFAULTS.timeGap
-  for _,p in ipairs(photos) do
+  local total = #photos
+  for idx,p in ipairs(photos) do
 
-    local ct = safeGetMetadata(p, 'captureTime') or 0
+    local ct = getCaptureTime(p) or 0
     if last and prefs.bracketDebugMode then
       Log.debug(string.format('Time gap to previous: %.2fs', ct - last))
     end
@@ -108,8 +131,19 @@ local function groupByTime(photos, prefs)
       table.insert(cur.orientations, o)
     end
     last = ct
+
+    -- Periodically update progress for large datasets
+    if progress and idx % 50 == 0 then
+      progress:setPortionComplete(idx/total)
+      progress:setCaption(string.format('Analyzing %d of %d photos', idx, total))
+      LrTasks.yield()
+    end
   end
   if cur and #cur.photos>0 then table.insert(groups, cur) end
+  if progress then
+    progress:setPortionComplete(1)
+    progress:setCaption('Classifying groups...')
+  end
   return groups
 end
 
@@ -162,8 +196,9 @@ local function mergeIncomplete(groups, prefs)
   return merged
 end
 
-function M.analyzeBrackets(photos, prefs)
+function M.analyzeBrackets(photos, prefs, progress)
   prefs = prefs or {}
+  metadataCache = {} -- reset cache for fresh analysis
   for k,v in pairs(DEFAULTS) do if prefs[k] == nil then prefs[k] = v end end
   Log.info('Analyzing brackets for '..#photos..' photos')
   if prefs.bracketDebugMode then
@@ -172,8 +207,14 @@ function M.analyzeBrackets(photos, prefs)
       Log.debug('Bracket size override preference: '..tostring(prefs.expectedBracketSize))
     end
   end
-  local groups = groupByTime(photos, prefs)
-  for _,g in ipairs(groups) do classifyGroup(g, prefs) end
+  local groups = groupByTime(photos, prefs, progress)
+  for idx,g in ipairs(groups) do
+    classifyGroup(g, prefs)
+    if progress and idx % 20 == 0 then
+      progress:setCaption(string.format('Classifying group %d of %d', idx, #groups))
+      LrTasks.yield()
+    end
+  end
   groups = mergeIncomplete(groups, prefs)
   local expected = prefs.expectedBracketSize or DEFAULTS.expectedBracketSize
   for idx,g in ipairs(groups) do
@@ -247,22 +288,34 @@ function M.applyStacks(groups, prefs)
 end
 
 function M.analyze()
-  local catalog = LrApplication.activeCatalog()
-  local photos = catalog:getTargetPhotos()
-  if #photos == 0 then
-    LrDialogs.message('WildlifeAI', 'No photos selected')
-    return
-  end
-  local prefs = LrPrefs.prefsForPlugin()
-  lastAnalysis = M.analyzeBrackets(photos, prefs)
-  LrPrefs.prefsForPlugin().bracketAnalysisDone = true
-  local low = 0
-  for _,g in ipairs(lastAnalysis) do if g.lowConfidence then low = low + 1 end end
-  local msg = 'Bracket analysis complete.'
-  if low > 0 then
-    msg = msg .. '\n' .. low .. ' group(s) lacked exposure or orientation data. Time gaps were used and results may be less accurate.'
-  end
-  LrDialogs.message('WildlifeAI', msg)
+  LrTasks.startAsyncTask(function()
+    local catalog = LrApplication.activeCatalog()
+    local photos = catalog:getTargetPhotos()
+    if #photos == 0 then
+      LrDialogs.message('WildlifeAI', 'No photos selected')
+      return
+    end
+    local prefs = LrPrefs.prefsForPlugin()
+    local progress = LrProgressScope{ title = 'WildlifeAI Bracket Analysis' }
+    progress:setCancelable(true)
+
+    lastAnalysis = M.analyzeBrackets(photos, prefs, progress)
+    progress:done()
+
+    if progress:isCanceled() then
+      LrDialogs.message('WildlifeAI', 'Bracket analysis canceled.')
+      return
+    end
+
+    LrPrefs.prefsForPlugin().bracketAnalysisDone = true
+    local low = 0
+    for _,g in ipairs(lastAnalysis) do if g.lowConfidence then low = low + 1 end end
+    local msg = 'Bracket analysis complete.'
+    if low > 0 then
+      msg = msg .. '\n' .. low .. ' group(s) lacked exposure or orientation data. Time gaps were used and results may be less accurate.'
+    end
+    LrDialogs.message('WildlifeAI', msg)
+  end)
 end
 
 function M.hasAnalysis()
