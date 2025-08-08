@@ -18,6 +18,7 @@ local function setupDefaultPrefs()
   
   -- Processing options
   prefs.enableStacking  = prefs.enableStacking  or false
+  prefs.bracketAnalysisDone = prefs.bracketAnalysisDone or false
   prefs.writeXMP        = prefs.writeXMP        or false
   prefs.mirrorJobId     = prefs.mirrorJobId     or false
   prefs.generateCrops   = prefs.generateCrops   ~= false -- default true
