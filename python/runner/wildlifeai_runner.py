@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 import numpy as np
 from PIL import Image
@@ -477,6 +478,7 @@ class EnhancedModelRunner:
         self.quality_classifier = None
         self.previous_image = None
         self.scene_count = self._load_global_scene_count()
+        self._state_lock = threading.Lock()
         
         # Find the actual model directory
         self.model_dir = find_model_directory()
@@ -601,7 +603,7 @@ class EnhancedModelRunner:
             except Exception as exc:
                 logging.error(f"Failed to load Keras quality classifier: {exc}")
 
-    def predict_single(self, photo_path: str) -> Tuple[str, float, float, Dict]:
+    def predict_single(self, photo_path: str) -> Tuple[str, float, float, Dict, int]:
         """Run inference on a single image (exact original implementation logic)."""
         try:
             # Read the image using ImageMagick (original approach)
@@ -619,12 +621,12 @@ class EnhancedModelRunner:
                 }
             
             # Compute similarity with previous image for scene detection
-            similarity = compute_image_similarity_akaze(self.previous_image, img)
-            if not similarity['similar']:
-                self.scene_count += 1
-                
-            # Update previous_image for next iteration
-            self.previous_image = img.copy()
+            with self._state_lock:
+                similarity = compute_image_similarity_akaze(self.previous_image, img)
+                if not similarity['similar']:
+                    self.scene_count += 1
+                self.previous_image = img.copy()
+                current_scene = self.scene_count
             
             # Get predictions from Mask-RCNN
             if not self.mask_rcnn or self.mask_rcnn.model is None:
@@ -673,10 +675,12 @@ class EnhancedModelRunner:
                 except Exception as exc:
                     logging.error(f"Quality prediction failed: {exc}")
             
-            return species, species_confidence, quality_score, similarity
+            return species, species_confidence, quality_score, similarity, current_scene
             
         except Exception as e:
             logging.error(f"Error processing {photo_path}: {e}")
+            with self._state_lock:
+                current_scene = self.scene_count
             return "No Bird", 0, -1, {
                 'feature_similarity': -1,
                 'feature_confidence': -1,
@@ -684,14 +688,14 @@ class EnhancedModelRunner:
                 'color_confidence': -1,
                 'similar': False,
                 'confidence': 0
-            }
+            }, current_scene
 
     def process_photo(self, photo_path: str, output_dir: Path, generate_crops: bool = True) -> Dict:
         """Process a single photo and return results (enhanced with full similarity data)."""
         start_time = time.time()
         
         # Run inference
-        species, species_confidence, quality_score, similarity = self.predict_single(photo_path)
+        species, species_confidence, quality_score, similarity, scene_count = self.predict_single(photo_path)
         
         # Generate outputs if requested
         export_path = ""
@@ -785,7 +789,7 @@ class EnhancedModelRunner:
             "export_path": str(export_path) if export_path else "",
             "crop_path": str(crop_path) if crop_path else "",
             "rating": rating,
-            "scene_count": self.scene_count,
+            "scene_count": scene_count,
             "feature_similarity": converted_feature_similarity,
             "feature_confidence": converted_feature_confidence,
             "color_similarity": converted_color_similarity,
@@ -794,7 +798,7 @@ class EnhancedModelRunner:
         }
         
         # Enhanced logging to show both raw and converted values for debugging
-        logging.info(f"Processed {Path(photo_path).name}: Species: {species}, Confidence: {result['species_confidence']}, Quality: {result['quality']}, Rating: {rating}, Similarity: {similarity.get('similar', False)}, Scene Count: {self.scene_count}")
+        logging.info(f"Processed {Path(photo_path).name}: Species: {species}, Confidence: {result['species_confidence']}, Quality: {result['quality']}, Rating: {rating}, Similarity: {similarity.get('similar', False)}, Scene Count: {scene_count}")
         
         # Always show detailed results for debugging/regression testing
         logging.info(f"Raw Values - Species Conf: {species_confidence:.6f}, Quality: {quality_score:.6f}")
@@ -804,14 +808,13 @@ class EnhancedModelRunner:
         
         return result
 
-    def process_batch(self, photo_paths: List[str], output_dir: Path, 
+    def process_batch(self, photo_paths: List[str], output_dir: Path,
                      generate_crops: bool = True, progress_callback: Optional[callable] = None) -> List[Dict]:
-        """Process multiple photos sequentially to maintain scene counting."""
-        results = []
+        """Process multiple photos concurrently."""
+        results: List[Dict] = []
         results_file = output_dir / "results.json"
         status_file = output_dir / "status.json"
-        
-        # Write initial status
+
         status = {
             "status": "processing",
             "start_time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -826,82 +829,37 @@ class EnhancedModelRunner:
             logging.info(f"Created status file: {status_file}")
         except Exception as e:
             logging.warning(f"Failed to create status file: {e}")
-        
-        # Process sequentially to maintain scene counting state
-        for i, photo_path in enumerate(photo_paths, 1):
-            # Update status before processing
-            status.update({
-                "processed": i - 1,
-                "current_photo": Path(photo_path).name,
-                "progress_percent": ((i - 1) / len(photo_paths)) * 100
-            })
-            try:
-                with open(status_file, 'w') as f:
-                    json.dump(status, f, indent=2)
-            except Exception as e:
-                logging.warning(f"Failed to update status: {e}")
-            
-            try:
-                result = self.process_photo(photo_path, output_dir, generate_crops)
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_photo = {
+                executor.submit(self.process_photo, path, output_dir, generate_crops): path
+                for path in photo_paths
+            }
+
+            for i, future in enumerate(as_completed(future_to_photo), 1):
+                photo_path = future_to_photo[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    logging.error(f"Failed to process {photo_path}: {exc}")
+                    result = {
+                        "filename": Path(photo_path).name,
+                        "species": "Unknown",
+                        "species_confidence": 0,
+                        "quality": 0,
+                        "error": str(exc)
+                    }
                 results.append(result)
-                
-                # Write incremental results after each photo
-                try:
-                    with open(results_file, 'w') as f:
-                        json.dump(results, f, indent=2, default=str)
-                    logging.debug(f"Updated results.json with {len(results)} results")
-                except Exception as e:
-                    logging.warning(f"Failed to write incremental results: {e}")
-                
-                # Update status after processing
-                status.update({
-                    "processed": i,
-                    "current_photo": Path(photo_path).name,
-                    "progress_percent": (i / len(photo_paths)) * 100
-                })
-                try:
-                    with open(status_file, 'w') as f:
-                        json.dump(status, f, indent=2)
-                    logging.debug(f"Updated status: {i}/{len(photo_paths)} completed")
-                except Exception as e:
-                    logging.warning(f"Failed to update status after processing: {e}")
-                
                 if progress_callback:
                     progress_callback(i, len(photo_paths), Path(photo_path).name)
-                        
-            except Exception as exc:
-                logging.error(f"Failed to process {photo_path}: {exc}")
-                error_result = {
-                    "filename": Path(photo_path).name,
-                    "species": "Unknown",
-                    "species_confidence": 0,
-                    "quality": 0,
-                    "error": str(exc)
-                }
-                results.append(error_result)
-                
-                # Write incremental results even for errors
-                try:
-                    with open(results_file, 'w') as f:
-                        json.dump(results, f, indent=2, default=str)
-                    logging.debug(f"Updated results.json with error result")
-                except Exception as e:
-                    logging.warning(f"Failed to write incremental error result: {e}")
-                
-                # Update status after error
-                status.update({
-                    "processed": i,
-                    "current_photo": Path(photo_path).name,
-                    "progress_percent": (i / len(photo_paths)) * 100,
-                    "last_error": str(exc)
-                })
-                try:
-                    with open(status_file, 'w') as f:
-                        json.dump(status, f, indent=2)
-                except Exception as e:
-                    logging.warning(f"Failed to update status after error: {e}")
-        
-        # Write final completion status
+
+        try:
+            with open(results_file, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            logging.debug(f"Wrote results for {len(results)} photos")
+        except Exception as e:
+            logging.warning(f"Failed to write results file: {e}")
+
         status.update({
             "status": "completed",
             "end_time": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -915,10 +873,9 @@ class EnhancedModelRunner:
             logging.info(f"Processing completed - updated status file")
         except Exception as e:
             logging.warning(f"Failed to write final status: {e}")
-        
-        # Save the final scene count for persistence across runs
+
         self._save_global_scene_count()
-        
+
         return results
 
     def load_expected_results_from_csv(self, csv_path: str) -> Dict[str, Dict]:
