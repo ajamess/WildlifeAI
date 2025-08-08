@@ -9,6 +9,8 @@ local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 local M = {}
 local lastAnalysis = nil
 
+-- Lightroom metadata fields used: 'dateTimeOriginal' for capture time and 'orientation'
+-- for image rotation. Assumes orientation codes follow EXIF 1-8 specification.
 
 local DEFAULTS = {
   timeGap = 2, -- seconds between shots to be grouped
@@ -16,6 +18,7 @@ local DEFAULTS = {
   expectedBracketSize = 3,
   collapseStacks = true,
   bracketDebugMode = false,
+  orientationTolerance = 0, -- orientation code difference to start new group
 }
 
 local function parseNumber(v)
@@ -80,56 +83,74 @@ local function getOrientation(photo)
 
 end
 
+-- Return capture time using original EXIF date/time field. Lightroom returns
+-- either a numeric epoch value or a formatted string; convert both to seconds.
+local function getCaptureTime(photo)
+  local dt = safeGetMetadata(photo, 'dateTimeOriginal')
+  if type(dt) == 'number' then return dt end
+  if type(dt) == 'string' then
+    local y,mo,d,h,mi,s = dt:match('^(%d+):(%d+):(%d+) (%d+):(%d+):(%d+)')
+    if y then
+      return os.time{year=tonumber(y), month=tonumber(mo), day=tonumber(d),
+                     hour=tonumber(h), min=tonumber(mi), sec=tonumber(s)}
+    end
+    return tonumber(dt) or 0
+  end
+  return 0
+end
+
 -- Group photos by capture time
 local function groupByTime(photos, prefs, progress)
   table.sort(photos, function(a,b)
-    return (getCaptureTime(a) or 0) < (getCaptureTime(b) or 0)
+
+    return getCaptureTime(a) < getCaptureTime(b)
+
   end)
   local groups = {}
-  local cur, last = nil, nil
+  local cur
+  local lastCt, lastOr = nil, nil
   local gap = prefs.timeGap or DEFAULTS.timeGap
-  local total = #photos
-  for idx,p in ipairs(photos) do
+  local oTol = prefs.orientationTolerance or DEFAULTS.orientationTolerance -- orientation code tolerance (EXIF 1-8)
+  for _,p in ipairs(photos) do
 
-    local ct = getCaptureTime(p) or 0
-    if last and prefs.bracketDebugMode then
-      Log.debug(string.format('Time gap to previous: %.2fs', ct - last))
+    local ct = getCaptureTime(p)
+    local o = getOrientation(p)
+    if lastCt and prefs.bracketDebugMode then
+      Log.debug(string.format('Time gap to previous: %.2fs', ct - lastCt))
+
     end
 
-    if not last or (ct - last) <= gap then
-      if not cur then cur = {photos={}, exposures={}, orientations={}, lowConfidence=false} end
-      table.insert(cur.photos, p)
-      local ev = getExposureValue(p)
-      if not ev then
-        cur.lowConfidence = true
-        Log.warning('Missing exposure data for '..tostring(p))
+    local timeBreak = lastCt and (ct - lastCt) > gap
+    local orientationBreak = false
+    if lastOr and o then
+      -- orientation codes are integers; treat any change beyond tolerance as a new group
+      orientationBreak = math.abs(o - lastOr) > oTol
+      if orientationBreak and prefs.bracketDebugMode then
+        Log.debug(string.format('Orientation change %d -> %d exceeds %d', lastOr, o, oTol))
       end
-      table.insert(cur.exposures, ev or 0)
-      local o = getOrientation(p)
-      if not o then
-        cur.lowConfidence = true
-        Log.warning('Missing orientation for '..tostring(p))
-      end
-      table.insert(cur.orientations, o)
-    else
-      if prefs.bracketDebugMode then
-        Log.debug(string.format('Gap %.2fs exceeds %.2fs, starting new group', ct - last, gap))
-      end
-      table.insert(groups, cur)
-      cur = {photos={p}, exposures={}, orientations={}, lowConfidence=false}
-      local ev = getExposureValue(p)
-      if not ev then
-        cur.lowConfidence = true
-        Log.warning('Missing exposure data for '..tostring(p))
-      end
-      table.insert(cur.exposures, ev or 0)
-      local o = getOrientation(p)
-      if not o then
-        cur.lowConfidence = true
-        Log.warning('Missing orientation for '..tostring(p))
-      end
-      table.insert(cur.orientations, o)
     end
+
+
+    if not cur or timeBreak or orientationBreak then
+      if cur then table.insert(groups, cur) end
+      cur = {photos={}, exposures={}, orientations={}, lowConfidence=false}
+    end
+    table.insert(cur.photos, p)
+    local ev = getExposureValue(p)
+    if not ev then
+      cur.lowConfidence = true
+      Log.warning('Missing exposure data for '..tostring(p))
+    end
+    table.insert(cur.exposures, ev or 0)
+    if not o then
+      cur.lowConfidence = true
+      Log.warning('Missing orientation for '..tostring(p))
+    end
+    table.insert(cur.orientations, o)
+
+    lastCt = ct
+    lastOr = o
+
     last = ct
 
     -- Periodically update progress for large datasets
@@ -138,6 +159,7 @@ local function groupByTime(photos, prefs, progress)
       progress:setCaption(string.format('Analyzing %d of %d photos', idx, total))
       LrTasks.yield()
     end
+
   end
   if cur and #cur.photos>0 then table.insert(groups, cur) end
   if progress then
