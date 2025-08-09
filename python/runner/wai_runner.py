@@ -66,7 +66,8 @@ def load_image(path):
         except Exception as exc:  # pragma: no cover
             logging.warning("Failed to read RAW %s: %s", path, exc)
     if img is None:
-        img = np.array(Image.open(path).convert("RGB"))
+        with Image.open(path) as img_src:
+            img = np.array(img_src.convert("RGB"))
 
     if cv2:
         img = cv2.resize(img, (224, 224))
