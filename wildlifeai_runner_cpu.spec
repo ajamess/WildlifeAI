@@ -7,6 +7,7 @@ from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
 tf_datas, tf_bins, tf_hidden = collect_all("tensorflow")
 ort_datas, ort_bins, ort_hidden = collect_all("onnxruntime")
 torch_bins = collect_dynamic_libs("torch")
+rawpy_bins = collect_dynamic_libs("rawpy")
 # Collect Microsoft runtime and OpenMP libraries if present
 runtime_bins = []
 for lib in ["msvcp140", "vcruntime140", "libiomp5md"]:
@@ -86,7 +87,7 @@ hiddenimports = [
 
 # Append collected items
 datas += tf_datas + ort_datas
-binaries += tf_bins + ort_bins + torch_bins + runtime_bins
+binaries += tf_bins + ort_bins + torch_bins + runtime_bins + rawpy_bins
 hiddenimports += tf_hidden + ort_hidden
 
 a = Analysis(
