@@ -60,6 +60,12 @@ try:
     import rawpy
 except ImportError:
     rawpy = None
+
+# Log whether RAW support is available at startup
+if rawpy:
+    logging.debug("RAW support enabled via rawpy")
+else:
+    logging.warning("rawpy not installed; RAW files will not be processed")
 try:
     from wand.image import Image as WandImage
 except ImportError:
@@ -105,9 +111,17 @@ def read_image(path):
     # Fallback to rawpy/PIL approach
     ext = Path(path).suffix.lower()
     img = None
-    
+    raw_exts = {".arw", ".cr2", ".nef", ".dng", ".rw2"}
+
+    # Warn if RAW file encountered without rawpy
+    if rawpy is None and ext in raw_exts:
+        logging.warning(
+            f"Cannot load RAW file {path}: rawpy is required for RAW image support"
+        )
+        return None
+
     # Handle RAW files
-    if rawpy and ext in {".arw", ".cr2", ".nef", ".dng", ".rw2"}:
+    if rawpy and ext in raw_exts:
         try:
             with rawpy.imread(path) as raw:
                 img = raw.postprocess(no_auto_bright=True, output_color=rawpy.ColorSpace.sRGB)
