@@ -6,6 +6,7 @@ from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
 # Collect additional data, binaries, and hidden imports
 tf_datas, tf_bins, tf_hidden = collect_all("tensorflow")
 ort_datas, ort_bins, ort_hidden = collect_all("onnxruntime")
+keras_datas, keras_bins, keras_hidden = collect_all("keras")
 torch_bins = collect_dynamic_libs("torch")
 rawpy_bins = collect_dynamic_libs("rawpy")
 # Collect Microsoft runtime and OpenMP libraries if present
@@ -33,31 +34,12 @@ binaries = []
 hiddenimports = [
     # TensorFlow components (for quality classifier)
     'tensorflow',
-    'tensorflow.keras',
-    'tensorflow.keras.models',
-    'tensorflow.keras.layers',
-    'tensorflow.keras.utils',
-    'tensorflow.python',
-    'tensorflow.python.keras',
-    'tensorflow.python.keras.models',
-    'tensorflow.python.keras.layers',
-    'tensorflow.python.keras.engine',
-    'tensorflow.python.keras.engine.sequential',
-    'tensorflow.python.keras.engine.functional',
-    'tensorflow.python.saved_model',
-    'tensorflow.python.saved_model.loader',
-    'tensorflow.python.framework',
-    'tensorflow.python.framework.ops',
-    'tensorflow.python.ops',
-    'tensorflow.python.platform',
-    'tensorflow.python.platform.gfile',
     'tensorflow.lite',
     'keras',
     'keras.models',
     'keras.layers',
     'keras.utils',
     'keras.saving',
-    'keras.saving.legacy',
     # ONNX Runtime
     'onnxruntime',
     # Core Python libraries
@@ -86,9 +68,9 @@ hiddenimports = [
 ]
 
 # Append collected items
-datas += tf_datas + ort_datas
-binaries += tf_bins + ort_bins + torch_bins + runtime_bins + rawpy_bins
-hiddenimports += tf_hidden + ort_hidden
+datas += tf_datas + ort_datas + keras_datas
+binaries += tf_bins + ort_bins + keras_bins + torch_bins + runtime_bins + rawpy_bins
+hiddenimports += tf_hidden + ort_hidden + keras_hidden
 
 a = Analysis(
     [str(python_dir / 'wildlifeai_runner.py')],
