@@ -15,11 +15,21 @@ SPECIESCLASSIFIER_LABELS = "models/labels.txt"
 QUALITYCLASSIFIER_PATH = "models/quality.keras"
 
 # prompt user for ONNX inference provider
-onnx_provider_input = input("Do you want to use GPU for ONNX inference? (y/n): ").strip().lower()
+onnx_provider_input = input(
+    "Do you want to use GPU for ONNX inference? (y/n): "
+).strip().lower()
+
+# Default to CPU inference unless user explicitly selects GPU
+ONNX_USE_GPU = False
 if onnx_provider_input == 'y':
     ONNX_USE_GPU = True
 elif onnx_provider_input == 'n':
-    ONNX_USE_GPU = False
+    pass
+else:
+    print(
+        "Warning: invalid input for GPU selection. Using CPU for ONNX inference."
+    )
+
 if ONNX_USE_GPU:
     ONNX_PROVIDER = ['DmlExecutionProvider']
 else:
