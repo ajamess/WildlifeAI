@@ -392,6 +392,18 @@ def compute_image_similarity_akaze(img1, img2, max_dim=1600):
         
         # Match features using BFMatcher
         bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+        if len(des1) < 2 or len(des2) < 2:
+            mean1 = np.mean(img1.reshape(-1, img1.shape[-1]), axis=0)
+            mean2 = np.mean(img2.reshape(-1, img2.shape[-1]), axis=0)
+            color_diff = np.sum(np.abs(mean1 - mean2))
+            return {
+                'feature_similarity': 0,
+                'feature_confidence': 0,
+                'color_similarity': color_diff,
+                'color_confidence': abs((768 - color_diff) / 768) if color_diff <= 150 else abs(color_diff / 768),
+                'similar': color_diff <= 150,
+                'confidence': abs((768 - color_diff) / 768) if color_diff <= 150 else abs(color_diff / 768)
+            }
         matches = bf.knnMatch(des1, des2, k=2)
         m_arr = np.array([m.distance for m, n in matches])
         n_arr = np.array([n.distance for m, n in matches])
