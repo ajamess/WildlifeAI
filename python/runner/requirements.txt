@@ -1,6 +1,7 @@
 torch>=2.4.1
 torchvision>=0.19.1
 tensorflow>=2.18,<2.19
+keras>=3.5.0
 onnxruntime-directml>=1.22.0   # use onnxruntime on macOS
 numpy<2.1.0
 opencv-python>=4.11.0
