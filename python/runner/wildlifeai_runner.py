@@ -30,7 +30,7 @@ except ImportError:
 # Try to import TensorFlow directly for PyInstaller compatibility
 try:
     import tensorflow as tf
-    from tensorflow import keras
+    import keras
     _tensorflow_available = True
 except ImportError:
     tf = None
@@ -44,7 +44,7 @@ def load_tensorflow():
     # Force reimport attempt for PyInstaller compatibility
     try:
         import tensorflow as _tf
-        from tensorflow import keras as _keras
+        import keras as _keras
         tf = _tf
         keras = _keras
         _tensorflow_available = True
@@ -460,7 +460,7 @@ class QualityClassifier:
     
     def __init__(self, model_path):
         self.model_path = model_path
-        self.model = tf.keras.models.load_model(self.model_path)
+        self.model = keras.models.load_model(self.model_path, safe_mode=False)
         
     def _preprocess_image_classifier(self, cropped_img, cropped_mask):
         """Preprocess image for quality classification (exact original implementation)."""
