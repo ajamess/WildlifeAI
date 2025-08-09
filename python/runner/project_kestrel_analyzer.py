@@ -4,10 +4,10 @@ import cv2
 import numpy as np
 from PIL import Image
 import torchvision.transforms as T
-import tensorflow as tf
 import onnxruntime as ort
 from wand.image import Image as WandImage
 import pandas as pd
+import keras
 
 SPECIESCLASSIFIER_PATH = "models/model.onnx"
 SPECIESCLASSIFIER_LABELS = "models/labels.txt"
@@ -288,7 +288,7 @@ class BirdSpeciesClassifier:
 class QualityClassifier:
     def __init__(self, model_path):
         self.model_path = model_path
-        self.model = tf.keras.models.load_model(self.model_path)
+        self.model = keras.models.load_model(self.model_path, safe_mode=False)
     def __preprocess_image_classifier(self, cropped_img, cropped_mask):
         img = cv2.cvtColor(cropped_img, cv2.COLOR_RGB2GRAY)  # shape: (1024, 1024)
         # Take derivative of image using Sobel filter
