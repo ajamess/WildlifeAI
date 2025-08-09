@@ -96,7 +96,13 @@ if !errorlevel! == 0 (
 
 :: GPU version (optional)
 echo Checking for CUDA availability...
-python -c "try: import onnxruntime as ort; print('CUDA available:', 'CUDAExecutionProvider' in ort.get_available_providers()); except: print('CUDA available: False')" > cuda_check.txt
+python - <<'PY' > cuda_check.txt
+try:
+    import onnxruntime as ort
+    print("CUDA available:", "CUDAExecutionProvider" in ort.get_available_providers())
+except Exception:
+    print("CUDA available: False")
+PY
 findstr /c:"CUDA available: True" cuda_check.txt >nul
 if !errorlevel! == 0 (
     echo Creating GPU version...
