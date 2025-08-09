@@ -74,8 +74,9 @@ class maskRCNN:
         # Filter predictions based on the confidence threshold
         if (np.array(pred_score) > threshold).sum()==0:
             return None, None, None, None
-        
-        pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
+
+        indices = [i for i, s in enumerate(pred_score) if s > threshold]
+        pred_t = indices[-1]
         
         # Extract masks, class labels, and bounding boxes for the filtered predictions
         masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
