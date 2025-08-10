@@ -367,16 +367,27 @@ return function(context, photos)
               
               -- Create new stack with highest quality photo on top
               local topPhoto = photosToStack[1]
-              for i = 2, #photosToStack do
-                topPhoto:addToStack(photosToStack[i])
+              -- Verify the top photo is a valid LrPhoto instance
+              local isPhoto = false
+              if topPhoto then
+                local ok = pcall(function() topPhoto:getRawMetadata('uuid') end)
+                isPhoto = ok and type(topPhoto.addToStack) == 'function'
               end
-              
-              -- Collapse if requested
-              if prefs.collapseStacks then
-                topPhoto:setStackCollapsed(true)
+
+              if isPhoto then
+                for i = 2, #photosToStack do
+                  topPhoto:addToStack(photosToStack[i])
+                end
+
+                -- Collapse if requested
+                if prefs.collapseStacks and type(topPhoto.setStackCollapsed) == 'function' then
+                  topPhoto:setStackCollapsed(true)
+                end
+
+                stackCount = stackCount + 1
+              else
+                LrDialogs.message('Stacking Error', 'Cannot create stack: invalid top photo.')
               end
-              
-              stackCount = stackCount + 1
             end
           end
         end
