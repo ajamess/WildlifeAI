@@ -17,9 +17,11 @@ local EPSILON = 0.001 -- For floating point comparisons
 
 -- Helper function to get photo timestamp
 local function getPhotoTimestamp(photo)
-  local dateTime = photo:getRawMetadata('dateTime')
-  if dateTime then
+  local dateTime = photo:getRawMetadata("dateTime")
+  if type(dateTime) == "table" and dateTime.timeInSeconds then
     return dateTime:timeInSeconds()
+  elseif type(dateTime) == "number" then
+    return dateTime
   end
   return 0
 end
@@ -63,7 +65,7 @@ function BracketStacking.extractPhotoMetadata(photos)
       local exposureValue = getExposureValue(photo)
       local orientation = getOrientation(photo)
       local fileName = photo:getFormattedMetadata('fileName') or 'Unknown'
-      
+
       return {
         photo = photo,
         timestamp = timestamp,
@@ -72,23 +74,27 @@ function BracketStacking.extractPhotoMetadata(photos)
         fileName = fileName
       }
     end)
-    
-    if success and data then
-      Log.debug(string.format("Photo %d: %s - timestamp: %s, EV: %s, orientation: %s", 
-        i, data.fileName, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
-      
-      table.insert(photoData, data)
-    else
+
+    if not success or not data then
       Log.warning(string.format("Failed to process photo %d: %s", i, tostring(data)))
-      -- Add photo with minimal data
-      table.insert(photoData, {
+      data = {
         photo = photo,
-        timestamp = os.time(), -- Use current time as fallback
+        timestamp = 0,
         exposureValue = nil,
         orientation = 'horizontal',
         fileName = 'Unknown'
-      })
+      }
     end
+
+    if data.timestamp == 0 then
+      Log.warning(string.format("Missing timestamp metadata for photo %d: %s", i, data.fileName))
+      data.timestamp = os.time()
+    end
+
+    Log.debug(string.format("Photo %d: %s - timestamp: %s, EV: %s, orientation: %s",
+      i, data.fileName, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
+
+    table.insert(photoData, data)
   end
   
   -- Sort by timestamp
