@@ -27,20 +27,43 @@ local function getPhotoTimestamp(photo)
 end
 
 -- Helper function to get exposure value from EXIF
+local function parseExposureValue(value)
+  if type(value) == 'number' then
+    return value
+  elseif type(value) == 'string' then
+    -- Handle fractional strings like "1/250"
+    local num, den = value:match('^%s*([%-]?%d+)%s*/%s*([%-]?%d+)%s*$')
+    if num and den then
+      local n = tonumber(num)
+      local d = tonumber(den)
+      if n and d and d ~= 0 then
+        return n / d
+      end
+    end
+    -- Remove common prefixes like 'f/' for aperture values
+    local cleaned = value:gsub('^%s*f/?', '')
+    local n = tonumber(cleaned)
+    if n then
+      return n
+    end
+  end
+  return nil
+end
+
 local function getExposureValue(photo)
   local success, result = pcall(function()
-    local aperture = photo:getRawMetadata('aperture')
-    local shutterSpeed = photo:getRawMetadata('shutterSpeed')
-    local iso = photo:getRawMetadata('isoSpeedRating')
-    
-    if aperture and shutterSpeed and iso then
+    local aperture = parseExposureValue(photo:getRawMetadata('aperture'))
+    local shutterSpeed = parseExposureValue(photo:getRawMetadata('shutterSpeed'))
+    local iso = parseExposureValue(photo:getRawMetadata('isoSpeedRating'))
+
+    if aperture and shutterSpeed and iso and aperture > 0 and shutterSpeed > 0 and iso > 0 then
       -- Calculate EV using standard formula: EV = log2(aperture²/shutterSpeed) + log2(iso/100)
       local ev = math.log(aperture * aperture / shutterSpeed, 2) + math.log(iso / 100, 2)
       return ev
     end
     return nil
   end)
-  
+
   return success and result or nil
 end
 
