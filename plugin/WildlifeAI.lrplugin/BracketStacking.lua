@@ -52,18 +52,50 @@ end
 
 local function getExposureValue(photo)
   local success, result = pcall(function()
+    -- Try multiple EXIF field names for different camera formats
     local aperture = parseExposureValue(photo:getRawMetadata('aperture'))
     local shutterSpeed = parseExposureValue(photo:getRawMetadata('shutterSpeed'))
     local iso = parseExposureValue(photo:getRawMetadata('isoSpeedRating'))
+    
+    -- Try alternative field names if primary ones fail
+    if not aperture then
+      aperture = parseExposureValue(photo:getRawMetadata('fNumber'))
+        or parseExposureValue(photo:getRawMetadata('fnumber'))
+        or parseExposureValue(photo:getRawMetadata('apertureValue'))
+    end
+    
+    if not shutterSpeed then
+      shutterSpeed = parseExposureValue(photo:getRawMetadata('exposureTime'))
+        or parseExposureValue(photo:getRawMetadata('shutterSpeedValue'))
+        or parseExposureValue(photo:getRawMetadata('exposuretime'))
+    end
+    
+    if not iso then
+      iso = parseExposureValue(photo:getRawMetadata('iso'))
+        or parseExposureValue(photo:getRawMetadata('isoSpeedRatings'))
+        or parseExposureValue(photo:getRawMetadata('photographicSensitivity'))
+    end
+
+    -- Debug logging for EXIF data extraction
+    Log.debug(string.format("EXIF data - aperture: %s, shutterSpeed: %s, iso: %s", 
+      tostring(aperture), tostring(shutterSpeed), tostring(iso)))
 
     if aperture and shutterSpeed and iso and aperture > 0 and shutterSpeed > 0 and iso > 0 then
       -- Calculate EV using standard formula: EV = log2(aperture²/shutterSpeed) + log2(iso/100)
       local ev = math.log(aperture * aperture / shutterSpeed, 2) + math.log(iso / 100, 2)
+      Log.debug(string.format("Calculated EV: %.2f (f/%.1f, 1/%.0fs, ISO%d)", 
+        ev, aperture, 1/shutterSpeed, iso))
       return ev
+    else
+      Log.debug("Insufficient EXIF data for EV calculation")
+      return nil
     end
-    return nil
   end)
 
+  if not success then
+    Log.debug("Error in getExposureValue: " .. tostring(result))
+  end
+  
   return success and result or nil
 end
 
@@ -79,45 +111,105 @@ end
 -- Extract photo metadata outside of any async context
 function BracketStacking.extractPhotoMetadata(photos)
   Log.info("=== EXTRACTING PHOTO METADATA ===")
+  Log.info("Total photos received: " .. #photos)
+  
   local photoData = {}
   
-  -- Process all photos and extract metadata safely
+  -- Process all photos and extract metadata safely WITHOUT any task wrappers
   for i, photo in ipairs(photos) do
-    local success, data = LrTasks.pcall(function()
-      local timestamp = getPhotoTimestamp(photo)
-      local exposureValue = getExposureValue(photo)
-      local orientation = getOrientation(photo)
-      local fileName = photo:getFormattedMetadata('fileName') or 'Unknown'
-
-      return {
-        photo = photo,
-        timestamp = timestamp,
-        exposureValue = exposureValue,
-        orientation = orientation,
-        fileName = fileName
-      }
-    end)
-
-    if not success or not data then
-      Log.warning(string.format("Failed to process photo %d: %s", i, tostring(data)))
-      data = {
-        photo = photo,
-        timestamp = 0,
-        exposureValue = nil,
-        orientation = 'horizontal',
-        fileName = 'Unknown'
-      }
+    -- ENHANCED DIAGNOSTIC LOGGING
+    Log.info(string.format("=== PHOTO %d DEEP INSPECTION ===", i))
+    Log.info(string.format("Photo object type: %s", type(photo)))
+    Log.info(string.format("Photo object is nil: %s", tostring(photo == nil)))
+    
+    if photo then
+      -- Log all available methods and properties
+      Log.info("Available photo object methods/properties:")
+      local methodCount = 0
+      for key, value in pairs(photo) do
+        Log.info(string.format("  %s: %s", tostring(key), type(value)))
+        methodCount = methodCount + 1
+        if methodCount > 20 then -- Limit output to avoid overwhelming logs
+          Log.info("  ... (truncated - more than 20 properties)")
+          break
+        end
+      end
+      
+      -- Test specific critical methods
+      Log.info("Critical method availability:")
+      Log.info(string.format("  addToStack: %s", type(photo.addToStack)))
+      Log.info(string.format("  getRawMetadata: %s", type(photo.getRawMetadata)))
+      Log.info(string.format("  getFormattedMetadata: %s", type(photo.getFormattedMetadata)))
+      Log.info(string.format("  removeFromStack: %s", type(photo.removeFromStack)))
+      Log.info(string.format("  setRawMetadata: %s", type(photo.setRawMetadata)))
+      
+      -- Try to get basic metadata to test if object is functional
+      local testSuccess, testResult = pcall(function()
+        local fileName = photo:getFormattedMetadata('fileName')
+        local uuid = photo:getRawMetadata('uuid')
+        return { fileName = fileName, uuid = uuid }
+      end)
+      
+      Log.info(string.format("Basic metadata test - Success: %s", tostring(testSuccess)))
+      if testSuccess and testResult then
+        Log.info(string.format("  File name: %s", tostring(testResult.fileName)))
+        Log.info(string.format("  UUID: %s", tostring(testResult.uuid)))
+      else
+        Log.warning(string.format("  Error: %s", tostring(testResult)))
+      end
     end
+    
+    -- Verify photo object validity first
+    if photo and type(photo) == 'table' and type(photo.addToStack) == 'function' then
+      -- Extract metadata using plain pcall (no LrTasks wrapper)
+      local success, data = pcall(function()
+        local timestamp = getPhotoTimestamp(photo)
+        local exposureValue = getExposureValue(photo)
+        local orientation = getOrientation(photo)
+        local fileName = photo:getFormattedMetadata('fileName') or 'Unknown'
+        local photoId = photo:getRawMetadata('uuid') or photo:getFormattedMetadata('uuid') or tostring(i)
 
-    if data.timestamp == 0 then
-      Log.warning(string.format("Missing timestamp metadata for photo %d: %s", i, data.fileName))
-      data.timestamp = os.time()
+        return {
+          photoId = photoId,  -- Store ID instead of photo object
+          photoIndex = i,     -- Store original index for re-resolution
+          timestamp = timestamp,
+          exposureValue = exposureValue,
+          orientation = orientation,
+          fileName = fileName
+        }
+      end)
+
+      if not success or not data then
+        Log.warning(string.format("Failed to process photo %d: %s", i, tostring(data)))
+        -- Create fallback data with photo ID
+        data = {
+          photoId = tostring(i),
+          photoIndex = i,
+          timestamp = os.time(),
+          exposureValue = nil,
+          orientation = 'horizontal',
+          fileName = 'Unknown'
+        }
+      end
+
+      if data.timestamp == 0 then
+        Log.warning(string.format("Missing timestamp metadata for photo %d: %s", i, data.fileName))
+        data.timestamp = os.time()
+      end
+
+      Log.debug(string.format("Photo %d: %s (ID: %s) - timestamp: %s, EV: %s, orientation: %s",
+        i, data.fileName, data.photoId, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
+
+      table.insert(photoData, data)
+    else
+      -- Log the invalid photo but continue processing
+      if not photo then
+        Log.warning(string.format("Photo %d is nil - skipping", i))
+      else
+        Log.warning(string.format("Photo %d is not a valid Lightroom photo object (type: %s, addToStack: %s) - skipping", 
+          i, type(photo), type(photo.addToStack)))
+      end
     end
-
-    Log.debug(string.format("Photo %d: %s - timestamp: %s, EV: %s, orientation: %s",
-      i, data.fileName, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
-
-    table.insert(photoData, data)
   end
   
   -- Sort by timestamp
@@ -129,6 +221,8 @@ function BracketStacking.extractPhotoMetadata(photos)
     Log.info("Photos sorted by time - first: " .. os.date("%H:%M:%S", photoData[1].timestamp) .. 
       ", last: " .. os.date("%H:%M:%S", photoData[#photoData].timestamp))
   end
+  
+  Log.info(string.format("Successfully extracted metadata for %d photos", #photoData))
   
   return photoData
 end
@@ -555,12 +649,17 @@ function BracketStacking.detectBrackets(photos, progressCallback)
 end
 
 -- Create stacks from detected brackets
-function BracketStacking.createStacks(detectionResults, progressCallback)
+function BracketStacking.createStacks(detectionResults, originalPhotos, progressCallback)
   local prefs = LrPrefs.prefsForPlugin()
   local catalog = LrApplication.activeCatalog()
   
   if not detectionResults or not detectionResults.sequences then
     return false, "No detection results provided"
+  end
+  
+  -- We'll get fresh photos within the write context, originalPhotos is just for count validation
+  if not originalPhotos or #originalPhotos == 0 then
+    return false, "No original photos provided for stack creation"
   end
   
   local sequences = detectionResults.sequences
@@ -591,6 +690,15 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
   end
   
   catalog:withWriteAccessDo('Create Bracket Stacks', function()
+    -- Get fresh photo objects within the write context
+    local freshPhotos = catalog:getTargetPhotos()
+    Log.info("Got " .. #freshPhotos .. " fresh photos in write context")
+    
+    -- Test if fresh photos have the required methods
+    if freshPhotos[1] then
+      Log.info("Fresh photo addToStack method: " .. type(freshPhotos[1].addToStack))
+    end
+    
     for _, sequence in ipairs(sequences) do
       for _, bracket in ipairs(sequence.brackets) do
         currentBracket = currentBracket + 1
@@ -599,83 +707,66 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           -- Call progress callback before photo operations to avoid yielding issues
           safeProgressCallback(currentBracket / totalBrackets, 
             "Creating stack " .. currentBracket .. " of " .. totalBrackets)
-          -- Remove any existing stacks first
+          
+          -- Re-resolve photo objects from fresh photo array using stored indices
+          local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
-            local photo = photoData.photo
-            if photo:getRawMetadata('isInStackInFolder') then
-              photo:removeFromStack()
+            local photo = freshPhotos[photoData.photoIndex]
+            if photo and type(photo.addToStack) == 'function' then
+              table.insert(resolvedPhotos, {
+                photo = photo,
+                photoData = photoData
+              })
+            else
+              Log.warning(string.format("Could not resolve photo %s (index %d) for stacking", 
+                photoData.fileName, photoData.photoIndex))
             end
           end
           
-          -- Determine top photo based on preferences
-          local topPhotoData = bracket.photos[1] -- Default to first
-          local topPhoto = topPhotoData.photo
-
-          if prefs.individualStackTopSelection == 'middle_exposure' and #bracket.photos >= 3 then
-            local middleIndex = math.ceil(#bracket.photos / 2)
-            topPhotoData = bracket.photos[middleIndex]
-            topPhoto = topPhotoData.photo
-          elseif prefs.individualStackTopSelection == 'base_exposure' then
-            -- Find the photo with exposure closest to 0 EV (if available)
-            local bestPhoto = bracket.photos[1]
-            local bestDiff = math.huge
-
-            for _, photoData in ipairs(bracket.photos) do
-              if photoData.exposureValue then
-                local diff = math.abs(photoData.exposureValue)
-                if diff < bestDiff then
-                  bestDiff = diff
-                  bestPhoto = photoData
-                end
+          if #resolvedPhotos < 2 then
+            Log.warning(string.format("Skipping bracket %d: only %d valid photos resolved", 
+              currentBracket, #resolvedPhotos))
+          else
+            -- Remove any existing stacks first
+            for _, resolved in ipairs(resolvedPhotos) do
+              if resolved.photo:getRawMetadata('isInStackInFolder') then
+                resolved.photo:removeFromStack()
               end
             end
-            topPhotoData = bestPhoto
-            topPhoto = topPhotoData.photo
-          elseif prefs.individualStackTopSelection == 'last_image' then
-            topPhotoData = bracket.photos[#bracket.photos]
-            topPhoto = topPhotoData.photo
-          end
+            
+            -- Determine top photo based on preferences
+            local topResolved = resolvedPhotos[1] -- Default to first
+            
+            if prefs.individualStackTopSelection == 'middle_exposure' and #resolvedPhotos >= 3 then
+              local middleIndex = math.ceil(#resolvedPhotos / 2)
+              topResolved = resolvedPhotos[middleIndex]
+            elseif prefs.individualStackTopSelection == 'base_exposure' then
+              -- Find the photo with exposure closest to 0 EV (if available)
+              local bestResolved = resolvedPhotos[1]
+              local bestDiff = math.huge
 
-          -- Verify top photo and fall back if necessary
-          if not (topPhoto and type(topPhoto.addToStack) == 'function') then
-            local fallback
-            for _, photoData in ipairs(bracket.photos) do
-              local photo = photoData.photo
-              if photo and type(photo.addToStack) == 'function' then
-                fallback = photoData
-                break
-              end
-            end
-
-            if fallback then
-              Log.warning(string.format(
-                "Preferred top photo %s is invalid; using %s instead for bracket %d",
-                tostring(topPhotoData.fileName or 'unknown'),
-                tostring(fallback.fileName or 'unknown'),
-                currentBracket))
-              topPhotoData = fallback
-              topPhoto = fallback.photo
-            else
-              Log.warning(string.format(
-                "Skipping bracket %d (%d photos): no valid top photo",
-                currentBracket,
-                #bracket.photos))
-            end
-          end
-
-          -- Create the stack if we have a valid top photo
-          if topPhoto and type(topPhoto.addToStack) == 'function' then
-            for _, photoData in ipairs(bracket.photos) do
-              local photo = photoData.photo
-              if photo ~= topPhoto then
-                if photo and type(photo.addToStack) == 'function' then
-                  topPhoto:addToStack(photo)
-                else
-                  Log.warning(string.format(
-                    "Skipping photo %s in bracket %d: missing addToStack",
-                    tostring(photoData.fileName or 'unknown'),
-                    currentBracket))
+              for _, resolved in ipairs(resolvedPhotos) do
+                if resolved.photoData.exposureValue then
+                  local diff = math.abs(resolved.photoData.exposureValue)
+                  if diff < bestDiff then
+                    bestDiff = diff
+                    bestResolved = resolved
+                  end
                 end
+              end
+              topResolved = bestResolved
+            elseif prefs.individualStackTopSelection == 'last_image' then
+              topResolved = resolvedPhotos[#resolvedPhotos]
+            end
+
+            local topPhoto = topResolved.photo
+            Log.debug(string.format("Selected top photo for bracket %d: %s (type=%s, addToStack=%s)", 
+              currentBracket, topResolved.photoData.fileName, type(topPhoto), type(topPhoto.addToStack)))
+
+            -- Create the stack using catalog method (more reliable than photo method)
+            for _, resolved in ipairs(resolvedPhotos) do
+              if resolved.photo ~= topPhoto then
+                catalog:createPhotoStack(topPhoto, resolved.photo)
               end
             end
 
@@ -699,7 +790,7 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
             stacksCreated = stacksCreated + 1
 
             Log.debug(string.format("Created %s stack with %d photos (confidence: %d%%)",
-              bracket.type, #bracket.photos, bracket.confidence))
+              bracket.type, #resolvedPhotos, bracket.confidence))
           end
         else
           Log.warning(string.format("Skipping bracket %d: only %d photo(s)",
