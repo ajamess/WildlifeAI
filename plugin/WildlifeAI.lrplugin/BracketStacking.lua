@@ -160,7 +160,7 @@ function BracketStacking.extractPhotoMetadata(photos)
     end
     
     -- Verify photo object validity first
-    if photo and type(photo) == 'table' and type(photo.addToStack) == 'function' then
+    if photo ~= nil then
       -- Extract metadata using plain pcall (no LrTasks wrapper)
       local success, data = pcall(function()
         local timestamp = getPhotoTimestamp(photo)
@@ -168,8 +168,10 @@ function BracketStacking.extractPhotoMetadata(photos)
         local orientation = getOrientation(photo)
         local uuid = photo:getRawMetadata('uuid') or photo:getFormattedMetadata('uuid') or tostring(i)
 
+        -- Store UUID-based identifier with extracted metadata
         return {
           uuid = uuid,
+
           timestamp = timestamp,
           exposureValue = exposureValue,
           orientation = orientation
@@ -197,13 +199,7 @@ function BracketStacking.extractPhotoMetadata(photos)
 
       table.insert(photoData, data)
     else
-      -- Log the invalid photo but continue processing
-      if not photo then
-        Log.warning(string.format("Photo %d is nil - skipping", i))
-      else
-        Log.warning(string.format("Photo %d is not a valid Lightroom photo object (type: %s, addToStack: %s) - skipping", 
-          i, type(photo), type(photo.addToStack)))
-      end
+      Log.warning(string.format("Photo %d is nil - skipping", i))
     end
   end
   
@@ -680,6 +676,10 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
   end
   
   catalog:withWriteAccessDo('Create Bracket Stacks', function()
+
+    Log.info("Resolving photos by UUID within write context")
+    
+
     for _, sequence in ipairs(sequences) do
       for _, bracket in ipairs(sequence.brackets) do
         currentBracket = currentBracket + 1
@@ -693,6 +693,7 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
             local photo = catalog:findPhotoByUuid(photoData.uuid)
+
             if photo and type(photo.addToStack) == 'function' then
               table.insert(resolvedPhotos, {
                 photo = photo,
@@ -701,6 +702,7 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
             else
               Log.warning(string.format("Could not resolve photo UUID %s for stacking",
                 tostring(photoData.uuid)))
+
             end
           end
 
@@ -710,8 +712,14 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           else
             -- Remove any existing stacks first
             for _, resolved in ipairs(resolvedPhotos) do
-              if resolved.photo:getRawMetadata('isInStackInFolder') then
-                resolved.photo:removeFromStack()
+              local ok, inStack = pcall(function()
+                return resolved.photo:getRawMetadata('isInStackInFolder')
+              end)
+              if ok and inStack then
+                local removed, err = pcall(function() resolved.photo:removeFromStack() end)
+                if not removed then
+                  Log.warning("Failed to remove photo from existing stack: " .. tostring(err))
+                end
               end
             end
 
@@ -743,6 +751,7 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
             local topPhoto = topResolved.photo
             Log.debug(string.format("Selected top photo for bracket %d: UUID=%s (type=%s, addToStack=%s)",
               currentBracket, topResolved.photoData.uuid, type(topPhoto), type(topPhoto.addToStack)))
+
 
             -- Create the stack using catalog method (more reliable than photo method)
             for _, resolved in ipairs(resolvedPhotos) do

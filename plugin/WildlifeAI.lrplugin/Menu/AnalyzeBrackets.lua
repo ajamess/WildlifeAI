@@ -65,7 +65,9 @@ LrTasks.startAsyncTask(function()
       Log.info("Getting photos in read context")
       local photos = catalog:getTargetPhotos()
       Log.info("Got " .. #photos .. " photos")
+
       photoMetadata = BracketStacking.extractPhotoMetadata(photos)
+
     end)
 
     if #photoMetadata == 0 then
