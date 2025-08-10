@@ -160,7 +160,7 @@ function BracketStacking.extractPhotoMetadata(photos)
     end
     
     -- Verify photo object validity first
-    if photo and type(photo) == 'table' and type(photo.addToStack) == 'function' then
+    if photo ~= nil then
       -- Extract metadata using plain pcall (no LrTasks wrapper)
       local success, data = pcall(function()
         local timestamp = getPhotoTimestamp(photo)
@@ -202,13 +202,7 @@ function BracketStacking.extractPhotoMetadata(photos)
 
       table.insert(photoData, data)
     else
-      -- Log the invalid photo but continue processing
-      if not photo then
-        Log.warning(string.format("Photo %d is nil - skipping", i))
-      else
-        Log.warning(string.format("Photo %d is not a valid Lightroom photo object (type: %s, addToStack: %s) - skipping", 
-          i, type(photo), type(photo.addToStack)))
-      end
+      Log.warning(string.format("Photo %d is nil - skipping", i))
     end
   end
   
@@ -690,14 +684,7 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
   end
   
   catalog:withWriteAccessDo('Create Bracket Stacks', function()
-    -- Get fresh photo objects within the write context
-    local freshPhotos = catalog:getTargetPhotos()
-    Log.info("Got " .. #freshPhotos .. " fresh photos in write context")
-    
-    -- Test if fresh photos have the required methods
-    if freshPhotos[1] then
-      Log.info("Fresh photo addToStack method: " .. type(freshPhotos[1].addToStack))
-    end
+    Log.info("Resolving photos by UUID within write context")
     
     for _, sequence in ipairs(sequences) do
       for _, bracket in ipairs(sequence.brackets) do
@@ -708,18 +695,18 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
           safeProgressCallback(currentBracket / totalBrackets, 
             "Creating stack " .. currentBracket .. " of " .. totalBrackets)
           
-          -- Re-resolve photo objects from fresh photo array using stored indices
+          -- Re-resolve photo objects using stored UUIDs
           local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
-            local photo = freshPhotos[photoData.photoIndex]
-            if photo and type(photo.addToStack) == 'function' then
+            local photo = catalog:findPhotoByUuid(photoData.photoId)
+            if photo ~= nil then
               table.insert(resolvedPhotos, {
                 photo = photo,
                 photoData = photoData
               })
             else
-              Log.warning(string.format("Could not resolve photo %s (index %d) for stacking", 
-                photoData.fileName, photoData.photoIndex))
+              Log.warning(string.format("Could not resolve photo %s (uuid %s) for stacking",
+                photoData.fileName, tostring(photoData.photoId)))
             end
           end
           
@@ -729,8 +716,14 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
           else
             -- Remove any existing stacks first
             for _, resolved in ipairs(resolvedPhotos) do
-              if resolved.photo:getRawMetadata('isInStackInFolder') then
-                resolved.photo:removeFromStack()
+              local ok, inStack = pcall(function()
+                return resolved.photo:getRawMetadata('isInStackInFolder')
+              end)
+              if ok and inStack then
+                local removed, err = pcall(function() resolved.photo:removeFromStack() end)
+                if not removed then
+                  Log.warning("Failed to remove photo from existing stack: " .. tostring(err))
+                end
               end
             end
             
@@ -760,8 +753,8 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
             end
 
             local topPhoto = topResolved.photo
-            Log.debug(string.format("Selected top photo for bracket %d: %s (type=%s, addToStack=%s)", 
-              currentBracket, topResolved.photoData.fileName, type(topPhoto), type(topPhoto.addToStack)))
+            Log.debug(string.format("Selected top photo for bracket %d: %s (type=%s)",
+              currentBracket, topResolved.photoData.fileName, type(topPhoto)))
 
             -- Create the stack using catalog method (more reliable than photo method)
             for _, resolved in ipairs(resolvedPhotos) do
