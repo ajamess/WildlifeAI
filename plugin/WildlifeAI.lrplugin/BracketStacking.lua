@@ -585,16 +585,18 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           end
           
           -- Determine top photo based on preferences
-          local topPhoto = bracket.photos[1].photo -- Default to first
-          
+          local topPhotoData = bracket.photos[1] -- Default to first
+          local topPhoto = topPhotoData.photo
+
           if prefs.individualStackTopSelection == 'middle_exposure' and #bracket.photos >= 3 then
             local middleIndex = math.ceil(#bracket.photos / 2)
-            topPhoto = bracket.photos[middleIndex].photo
+            topPhotoData = bracket.photos[middleIndex]
+            topPhoto = topPhotoData.photo
           elseif prefs.individualStackTopSelection == 'base_exposure' then
             -- Find the photo with exposure closest to 0 EV (if available)
             local bestPhoto = bracket.photos[1]
             local bestDiff = math.huge
-            
+
             for _, photoData in ipairs(bracket.photos) do
               if photoData.exposureValue then
                 local diff = math.abs(photoData.exposureValue)
@@ -604,22 +606,52 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
                 end
               end
             end
-            topPhoto = bestPhoto.photo
+            topPhotoData = bestPhoto
+            topPhoto = topPhotoData.photo
           elseif prefs.individualStackTopSelection == 'last_image' then
-            topPhoto = bracket.photos[#bracket.photos].photo
+            topPhotoData = bracket.photos[#bracket.photos]
+            topPhoto = topPhotoData.photo
           end
-          
-          -- Create the stack
+
+          -- Verify top photo and fall back if necessary
           if not (topPhoto and type(topPhoto.addToStack) == 'function') then
-            Log.warning('Top photo is invalid or missing addToStack; skipping this bracket')
-          else
+            local fallback
+            for _, photoData in ipairs(bracket.photos) do
+              local photo = photoData.photo
+              if photo and type(photo.addToStack) == 'function' then
+                fallback = photoData
+                break
+              end
+            end
+
+            if fallback then
+              Log.warning(string.format(
+                "Preferred top photo %s is invalid; using %s instead for bracket %d",
+                tostring(topPhotoData.fileName or 'unknown'),
+                tostring(fallback.fileName or 'unknown'),
+                currentBracket))
+              topPhotoData = fallback
+              topPhoto = fallback.photo
+            else
+              Log.warning(string.format(
+                "Skipping bracket %d (%d photos): no valid top photo",
+                currentBracket,
+                #bracket.photos))
+            end
+          end
+
+          -- Create the stack if we have a valid top photo
+          if topPhoto and type(topPhoto.addToStack) == 'function' then
             for _, photoData in ipairs(bracket.photos) do
               local photo = photoData.photo
               if photo ~= topPhoto then
                 if photo and type(photo.addToStack) == 'function' then
                   topPhoto:addToStack(photo)
                 else
-                  Log.warning('Skipping invalid photo without addToStack in bracket')
+                  Log.warning(string.format(
+                    "Skipping photo %s in bracket %d: missing addToStack",
+                    tostring(photoData.fileName or 'unknown'),
+                    currentBracket))
                 end
               end
             end
@@ -646,6 +678,9 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
             Log.debug(string.format("Created %s stack with %d photos (confidence: %d%%)",
               bracket.type, #bracket.photos, bracket.confidence))
           end
+        else
+          Log.warning(string.format("Skipping bracket %d: only %d photo(s)",
+            currentBracket, #bracket.photos))
         end
       end
     end
