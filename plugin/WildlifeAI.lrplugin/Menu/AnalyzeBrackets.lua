@@ -57,74 +57,31 @@ Log.info("Photo count: " .. photoCount)
 LrTasks.startAsyncTask(function()
 
   local success, err = pcall(function()
-    Log.info("=== PHASE 1: EXTRACT BASIC PHOTO INFO (NO YIELDING) ===")
-    
-    -- Phase 1: Get photos and extract only basic non-yielding metadata
-    local photos
-    local basicPhotoInfo = {}
-    
+    Log.info("=== PHASE 1: EXTRACT PHOTO METADATA ===")
+
+    local photoMetadata = {}
+
     catalog:withReadAccessDo(function()
       Log.info("Getting photos in read context")
-      photos = catalog:getTargetPhotos()
+      local photos = catalog:getTargetPhotos()
       Log.info("Got " .. #photos .. " photos")
-      
-      -- Extract basic info including UUID for each photo
-      for i, photo in ipairs(photos) do
-        local uuid = photo:getRawMetadata('uuid')
-        local fileName = photo:getFormattedMetadata('fileName') or ('Photo_' .. i)
-        local info = {
-          photoId = uuid,
-          fileName = fileName
 
-        }
-        table.insert(basicPhotoInfo, info)
-        Log.debug("Basic info for photo " .. i .. ": ID=" .. tostring(info.photoId))
-      end
+      photoMetadata = BracketStacking.extractPhotoMetadata(photos)
+
     end)
-    
-    if #basicPhotoInfo == 0 then
+
+    if #photoMetadata == 0 then
       LrDialogs.message('Photo Info Extraction Failed',
-        'Could not extract basic photo information.', 'error')
+        'Could not extract photo metadata.', 'error')
       return
     end
-    
-    Log.info("Successfully extracted basic info for " .. #basicPhotoInfo .. " photos")
-    
-    -- Phase 2: Skip complex bracket detection for now, just create simple stacks based on time grouping
-    Log.info("=== PHASE 2: CREATE STACKS (WITH WRITE ACCESS) ===")
-    
-    -- For now, create simple test stacks - group photos in sets of 3
-    local detectionResults = {
-      sequences = {},
-      stats = { totalPhotos = #basicPhotoInfo, processedPhotos = 0 }
-    }
-    
-    -- Create simple test sequences
-    for i = 1, #basicPhotoInfo, 3 do
-      local endIndex = math.min(i + 2, #basicPhotoInfo)
-      local groupPhotos = {}
-      
-      for j = i, endIndex do
-        table.insert(groupPhotos, basicPhotoInfo[j])
-      end
-      
-      if #groupPhotos >= 2 then  -- Only create stacks with 2+ photos
-        local sequence = {
-          type = 'individual',
-          brackets = {
-            {
-              photos = groupPhotos,
-              type = 'individual',
-              confidence = 80
-            }
-          }
-        }
-        table.insert(detectionResults.sequences, sequence)
-        detectionResults.stats.processedPhotos = detectionResults.stats.processedPhotos + #groupPhotos
-      end
-    end
-    
-    Log.info("Created " .. #detectionResults.sequences .. " test sequences for stacking")
+
+    Log.info("Successfully extracted metadata for " .. #photoMetadata .. " photos")
+
+    -- Phase 2: Perform bracket detection using metadata
+    Log.info("=== PHASE 2: DETECT BRACKETS FROM METADATA ===")
+
+    local detectionResults = BracketStacking.detectBracketsFromMetadata(photoMetadata)
     
     -- Check if any brackets were detected
     if not detectionResults.sequences or #detectionResults.sequences == 0 then
@@ -141,7 +98,7 @@ LrTasks.startAsyncTask(function()
     -- Show preview if enabled, otherwise proceed directly to stacking
     if prefs.showBracketPreview then
       LrFunctionContext.callWithContext('WildlifeAI_BracketPreview', function(context)
-        local result = BracketPreview.showPreview(context, photos, detectionResults)
+        local result = BracketPreview.showPreview(context, detectionResults)
         
         if result == 'ok' then
           -- User chose to create stacks - run in separate async task with progress
@@ -160,7 +117,7 @@ LrTasks.startAsyncTask(function()
               end
             end
             
-            local stackSuccess, stackMessage = BracketStacking.createStacks(detectionResults, photos, stackProgressCallback)
+            local stackSuccess, stackMessage = BracketStacking.createStacks(detectionResults, stackProgressCallback)
             
             if stackProgressScope then
               stackProgressScope:done()
@@ -198,7 +155,7 @@ LrTasks.startAsyncTask(function()
           end
         end
         
-        local stackSuccess, stackMessage = BracketStacking.createStacks(detectionResults, photos, stackProgressCallback)
+        local stackSuccess, stackMessage = BracketStacking.createStacks(detectionResults, stackProgressCallback)
         
         if stackProgressScope then
           stackProgressScope:done()

@@ -31,9 +31,10 @@ local function formatTimestamp(timestamp)
   return "Unknown"
 end
 
--- Helper function to get photo name from metadata
-local function getPhotoName(photoData)
-  return photoData.fileName or 'Unknown'
+-- Helper function to get photo name
+local function getPhotoName(photoMeta)
+  -- With metadata-only detection we only have UUID available
+  return photoMeta.uuid or 'Unknown'
 end
 
 -- Create summary statistics section
@@ -267,7 +268,7 @@ local function calculatePreviewStats(detectionResults)
 end
 
 -- Main preview dialog function
-function BracketPreview.showPreview(context, photos, detectionResults)
+function BracketPreview.showPreview(context, detectionResults)
   local f = LrView.osFactory()
   local props = LrBinding.makePropertyTable(context)
   
