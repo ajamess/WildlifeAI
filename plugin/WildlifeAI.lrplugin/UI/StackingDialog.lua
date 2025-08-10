@@ -261,7 +261,10 @@ return function(context, photos)
     
     -- Perform stacking operation
     LrTasks.startAsyncTask(function()
-      LrProgressScope.setCaption('Creating photo stacks...')
+      local progressScope = LrProgressScope {
+        title = 'Creating Photo Stacks',
+        caption = 'Creating photo stacks...'
+      }
       
       local catalog = LrApplication.activeCatalog()
       
@@ -270,7 +273,9 @@ return function(context, photos)
         local photoData = {}
         
         for i, photo in ipairs(photos) do
-          LrProgressScope.setPortionComplete(i / #photos * 0.3) -- 30% for data collection
+          if progressScope then
+            progressScope:setPortionComplete(i / #photos * 0.3) -- 30% for data collection
+          end
           
           local processed = photo:getPropertyForPlugin(_PLUGIN, 'wai_processed')
           local include = (processed == 'true') or prefs.includeUnprocessed
@@ -298,7 +303,9 @@ return function(context, photos)
         local groups = {}
         
         for i, data in ipairs(photoData) do
-          LrProgressScope.setPortionComplete(0.3 + (i / #photoData * 0.4)) -- 40% for grouping
+          if progressScope then
+            progressScope:setPortionComplete(0.3 + (i / #photoData * 0.4)) -- 40% for grouping
+          end
           
           local groupKey
           local method = prefs.stackingMethod
@@ -330,7 +337,9 @@ return function(context, photos)
         
         for groupKey, groupPhotos in pairs(groups) do
           groupIndex = groupIndex + 1
-          LrProgressScope.setPortionComplete(0.7 + (groupIndex / totalGroups * 0.3)) -- Final 30% for stacking
+          if progressScope then
+            progressScope:setPortionComplete(0.7 + (groupIndex / totalGroups * 0.3)) -- Final 30% for stacking
+          end
           
           if #groupPhotos >= prefs.minStackSize then
             -- Sort by quality
@@ -372,7 +381,10 @@ return function(context, photos)
           end
         end
         
-        LrProgressScope.setPortionComplete(1.0)
+        if progressScope then
+          progressScope:setPortionComplete(1.0)
+          progressScope:done()
+        end
         LrDialogs.message('Stacking Complete', 
           string.format('Created %d stacks from %d photos using method: %s', 
             stackCount, #photoData, prefs.stackingMethod), 'info')
