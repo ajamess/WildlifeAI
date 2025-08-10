@@ -68,16 +68,16 @@ LrTasks.startAsyncTask(function()
       photos = catalog:getTargetPhotos()
       Log.info("Got " .. #photos .. " photos")
       
-      -- Create basic info WITHOUT calling ANY photo methods (no metadata extraction)
-      for i = 1, #photos do
-        -- Don't call ANY methods on photo objects - just store the index
+      -- Extract basic info including UUID for each photo
+      for i, photo in ipairs(photos) do
+        local uuid = photo:getRawMetadata('uuid')
+        local fileName = photo:getFormattedMetadata('fileName') or ('Photo_' .. i)
         local info = {
-          photoIndex = i,
-          photoId = 'photo_' .. i,  -- Simple string ID
-          fileName = 'Photo_' .. i
+          photoId = uuid,
+          fileName = fileName
         }
         table.insert(basicPhotoInfo, info)
-        Log.debug("Basic info for photo " .. i .. ": ID=" .. info.photoId)
+        Log.debug("Basic info for photo " .. i .. ": ID=" .. tostring(info.photoId))
       end
     end)
     

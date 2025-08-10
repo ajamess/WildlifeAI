@@ -31,9 +31,9 @@ local function formatTimestamp(timestamp)
   return "Unknown"
 end
 
--- Helper function to get photo name
-local function getPhotoName(photo)
-  return photo:getFormattedMetadata('fileName') or 'Unknown'
+-- Helper function to get photo name from metadata
+local function getPhotoName(photoData)
+  return photoData.fileName or 'Unknown'
 end
 
 -- Create summary statistics section
@@ -132,8 +132,8 @@ local function createResultsTable(f, detectionResults, props)
   -- Build table data from detection results
   for _, sequence in ipairs(detectionResults.sequences) do
     for bracketIndex, bracket in ipairs(sequence.brackets) do
-      local firstPhoto = bracket.photos[1].photo
-      local lastPhoto = bracket.photos[#bracket.photos].photo
+      local firstPhoto = bracket.photos[1]
+      local lastPhoto = bracket.photos[#bracket.photos]
       local timeSpan = bracket.duration
       
       -- Determine issues
