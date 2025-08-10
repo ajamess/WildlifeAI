@@ -53,6 +53,34 @@ local function createIptcFieldItems()
   }
 end
 
+-- Bracket Stacking helper functions
+local function createBracketSizeItems()
+  return {
+    { title = '3', value = 3 },
+    { title = '5', value = 5 },
+    { title = '7', value = 7 },
+    { title = '9', value = 9 },
+    { title = 'Custom', value = 'custom' }
+  }
+end
+
+local function createPanoramaOrientationItems()
+  return {
+    { title = 'Vertical', value = 'vertical' },
+    { title = 'Horizontal', value = 'horizontal' },
+    { title = 'Both', value = 'both' }
+  }
+end
+
+local function createStackTopSelectionItems()
+  return {
+    { title = 'Middle Exposure', value = 'middle_exposure' },
+    { title = 'Base Exposure', value = 'base_exposure' },
+    { title = 'First Image', value = 'first_image' },
+    { title = 'Last Image', value = 'last_image' }
+  }
+end
+
 -- Helper function to parse range string like "0-20" or "80-100"
 local function parseRange(rangeStr)
   if not rangeStr or rangeStr == '' then return nil end
@@ -204,21 +232,43 @@ return function(context)
   if prefs.keywordDetectedSpecies == nil then prefs.keywordDetectedSpecies = true end
   if prefs.keywordSpeciesUnderSpeciesRoot == nil then prefs.keywordSpeciesUnderSpeciesRoot = false end
 
-  -- Bracket stacking defaults
+  -- Bracket stacking defaults - Complete implementation per spec
   if prefs.enableBracketStacking == nil then prefs.enableBracketStacking = false end
   prefs.defaultBracketSize = prefs.defaultBracketSize or 3
   prefs.customBracketSize = prefs.customBracketSize or 3
-  prefs.withinBracketInterval = prefs.withinBracketInterval or 2
-  prefs.betweenBracketInterval = prefs.betweenBracketInterval or 10
-  if prefs.matchExposureSettings == nil then prefs.matchExposureSettings = true end
-  prefs.exposureEvTolerance = prefs.exposureEvTolerance or 1.0
-  if prefs.enablePanoramaDetection == nil then prefs.enablePanoramaDetection = false end
-  prefs.panoramaMinFrames = prefs.panoramaMinFrames or 3
-  prefs.panoramaInterval = prefs.panoramaInterval or 5
-  if prefs.collapseBracketStacks == nil then prefs.collapseBracketStacks = true end
-  if prefs.middleExposureOnTop == nil then prefs.middleExposureOnTop = true end
-  if prefs.showBracketPreview == nil then prefs.showBracketPreview = false end
-  prefs.previewDelay = prefs.previewDelay or 0
+  if prefs.allowSmartBracketDetection == nil then prefs.allowSmartBracketDetection = true end
+  prefs.minBracketSize = prefs.minBracketSize or 3
+  prefs.maxBracketSize = prefs.maxBracketSize or 9
+  
+  -- Time threshold settings
+  prefs.withinBracketInterval = prefs.withinBracketInterval or 3.0
+  prefs.individualBracketGap = prefs.individualBracketGap or 30.0
+  prefs.panoramaBracketGap = prefs.panoramaBracketGap or 8.0
+  prefs.sessionBreakThreshold = prefs.sessionBreakThreshold or 300.0
+  
+  -- Exposure analysis settings
+  if prefs.useExposureValuesForDetection == nil then prefs.useExposureValuesForDetection = true end
+  prefs.minExposureStep = prefs.minExposureStep or 0.5
+  prefs.maxExposureStep = prefs.maxExposureStep or 3.0
+  if prefs.requireExposureVariation == nil then prefs.requireExposureVariation = true end
+  
+  -- Panorama detection settings
+  if prefs.useOrientationAsPanoramaHint == nil then prefs.useOrientationAsPanoramaHint = true end
+  prefs.panoramaOrientation = prefs.panoramaOrientation or 'vertical'
+  prefs.minPanoramaPositions = prefs.minPanoramaPositions or 3
+  prefs.maxPanoramaPositions = prefs.maxPanoramaPositions or 20
+  
+  -- Stack behavior settings
+  prefs.individualStackTopSelection = prefs.individualStackTopSelection or 'middle_exposure'
+  prefs.panoramaStackColorLabel = prefs.panoramaStackColorLabel or 'blue'
+  prefs.individualStackColorLabel = prefs.individualStackColorLabel or 'green'
+  if prefs.handleIncompleteBrackets == nil then prefs.handleIncompleteBrackets = true end
+  if prefs.mergeIncompleteAttempts == nil then prefs.mergeIncompleteAttempts = true end
+  
+  -- Preview settings
+  if prefs.showBracketPreview == nil then prefs.showBracketPreview = true end
+  if prefs.highlightPotentialIssues == nil then prefs.highlightPotentialIssues = true end
+  if prefs.autoRefreshPreview == nil then prefs.autoRefreshPreview = false end
 
   -- Create validation properties with proper function context
   local props = LrBinding.makePropertyTable(context)
@@ -1114,44 +1164,45 @@ return function(context)
     }
   }
   -- General settings tab (existing content)
-  local generalTab = f:row {
-    spacing = 15,
-    leftColumn,
-    rightColumn
+  local generalTab = f:column {
+    spacing = f:control_spacing(),
+    
+    f:row {
+      spacing = 15,
+      leftColumn,
+      rightColumn
+    }
   }
 
-  -- Bracket stacking tab
+  -- Bracket stacking tab - Complete implementation per spec
   local bracketTab = f:column {
     spacing = f:control_spacing(),
 
+    -- Basic Settings
     f:group_box {
       title = 'Basic Settings',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
       f:checkbox {
-        title = 'Enable automatic bracket stacking',
+        title = 'Enable Bracket Stacking',
         value = bind('enableBracketStacking')
       },
 
-      f:spacer { height = 5 },
+      f:spacer { height = 8 },
 
       f:row {
+        enabled = bind('enableBracketStacking'),
         f:static_text {
-          title = 'Default bracket size:',
+          title = 'Default Bracket Size:',
           width = 150,
           alignment = 'right'
         },
         f:popup_menu {
           value = bind('defaultBracketSize'),
-          items = {
-            { title = '3', value = 3 },
-            { title = '5', value = 5 },
-            { title = '7', value = 7 },
-            { title = 'Custom', value = 'custom' }
-          },
+          items = createBracketSizeItems(),
           immediate = true,
-          width = 80
+          width = 100
         },
         f:edit_field {
           value = bind('customBracketSize'),
@@ -1161,20 +1212,48 @@ return function(context)
             transform = function(value) return value == 'custom' end
           }
         }
+      },
+
+      f:checkbox {
+        enabled = bind('enableBracketStacking'),
+        title = 'Allow Smart Bracket Detection',
+        value = bind('allowSmartBracketDetection')
+      },
+
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Min Bracket Size:',
+          width = 150,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('minBracketSize'),
+          width_in_chars = 6,
+          immediate = true
+        },
+        f:static_text { title = '  Max:', width = 40 },
+        f:edit_field {
+          value = bind('maxBracketSize'),
+          width_in_chars = 6,
+          immediate = true
+        }
       }
     },
 
     f:spacer { height = 10 },
 
+    -- Time Threshold Settings
     f:group_box {
-      title = 'Time Thresholds',
+      title = 'Time Threshold Settings',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
       f:row {
+        enabled = bind('enableBracketStacking'),
         f:static_text {
-          title = 'Within bracket (sec):',
-          width = 150,
+          title = 'Within-Bracket Interval (sec):',
+          width = 200,
           alignment = 'right'
         },
         f:edit_field {
@@ -1185,13 +1264,42 @@ return function(context)
       },
 
       f:row {
+        enabled = bind('enableBracketStacking'),
         f:static_text {
-          title = 'Between brackets (sec):',
-          width = 150,
+          title = 'Individual Bracket Gap (sec):',
+          width = 200,
           alignment = 'right'
         },
         f:edit_field {
-          value = bind('betweenBracketInterval'),
+          value = bind('individualBracketGap'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      },
+
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Panorama Bracket Gap (sec):',
+          width = 200,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('panoramaBracketGap'),
+          width_in_chars = 8,
+          immediate = true
+        }
+      },
+
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Session Break Threshold (sec):',
+          width = 200,
+          alignment = 'right'
+        },
+        f:edit_field {
+          value = bind('sessionBreakThreshold'),
           width_in_chars = 8,
           immediate = true
         }
@@ -1200,66 +1308,105 @@ return function(context)
 
     f:spacer { height = 10 },
 
+    -- Exposure Analysis Settings
     f:group_box {
-      title = 'Exposure Analysis',
+      title = 'Exposure Analysis Settings',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
       f:checkbox {
-        title = 'Match exposure settings',
-        value = bind('matchExposureSettings')
+        enabled = bind('enableBracketStacking'),
+        title = 'Use Exposure Values for Detection',
+        value = bind('useExposureValuesForDetection')
       },
 
       f:row {
+        enabled = bind {
+          keys = {'enableBracketStacking', 'useExposureValuesForDetection'},
+          operation = function(binder, values)
+            return values.enableBracketStacking and values.useExposureValuesForDetection
+          end
+        },
         f:static_text {
-          title = 'EV tolerance:',
+          title = 'Min Exposure Step (EV):',
           width = 150,
           alignment = 'right'
         },
         f:edit_field {
-          value = bind('exposureEvTolerance'),
+          value = bind('minExposureStep'),
+          width_in_chars = 8,
+          immediate = true
+        },
+        f:static_text { title = '  Max:', width = 40 },
+        f:edit_field {
+          value = bind('maxExposureStep'),
           width_in_chars = 8,
           immediate = true
         }
+      },
+
+      f:checkbox {
+        enabled = bind {
+          keys = {'enableBracketStacking', 'useExposureValuesForDetection'},
+          operation = function(binder, values)
+            return values.enableBracketStacking and values.useExposureValuesForDetection
+          end
+        },
+        title = 'Require Exposure Variation',
+        value = bind('requireExposureVariation')
       }
     },
 
     f:spacer { height = 10 },
 
+    -- Panorama Detection
     f:group_box {
       title = 'Panorama Detection',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
       f:checkbox {
-        title = 'Detect panoramas',
-        value = bind('enablePanoramaDetection')
+        enabled = bind('enableBracketStacking'),
+        title = 'Use Orientation as Panorama Hint',
+        value = bind('useOrientationAsPanoramaHint')
       },
 
       f:row {
-        enabled = bind('enablePanoramaDetection'),
+        enabled = bind {
+          keys = {'enableBracketStacking', 'useOrientationAsPanoramaHint'},
+          operation = function(binder, values)
+            return values.enableBracketStacking and values.useOrientationAsPanoramaHint
+          end
+        },
         f:static_text {
-          title = 'Minimum frames:',
+          title = 'Panorama Orientation:',
           width = 150,
           alignment = 'right'
         },
-        f:edit_field {
-          value = bind('panoramaMinFrames'),
-          width_in_chars = 8,
-          immediate = true
+        f:popup_menu {
+          value = bind('panoramaOrientation'),
+          items = createPanoramaOrientationItems(),
+          immediate = true,
+          width = 120
         }
       },
 
       f:row {
-        enabled = bind('enablePanoramaDetection'),
+        enabled = bind('enableBracketStacking'),
         f:static_text {
-          title = 'Max gap (sec):',
+          title = 'Min Panorama Positions:',
           width = 150,
           alignment = 'right'
         },
         f:edit_field {
-          value = bind('panoramaInterval'),
-          width_in_chars = 8,
+          value = bind('minPanoramaPositions'),
+          width_in_chars = 6,
+          immediate = true
+        },
+        f:static_text { title = '  Max:', width = 40 },
+        f:edit_field {
+          value = bind('maxPanoramaPositions'),
+          width_in_chars = 6,
           immediate = true
         }
       }
@@ -1267,57 +1414,113 @@ return function(context)
 
     f:spacer { height = 10 },
 
+    -- Stack Behavior
     f:group_box {
       title = 'Stack Behavior',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
-      f:checkbox {
-        title = 'Collapse stacks after creation',
-        value = bind('collapseBracketStacks')
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Individual Stack Top Selection:',
+          width = 200,
+          alignment = 'right'
+        },
+        f:popup_menu {
+          value = bind('individualStackTopSelection'),
+          items = createStackTopSelectionItems(),
+          immediate = true,
+          width = 150
+        }
+      },
+
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Panorama Stack Color Label:',
+          width = 200,
+          alignment = 'right'
+        },
+        f:popup_menu {
+          value = bind('panoramaStackColorLabel'),
+          items = createColorItems(),
+          immediate = true,
+          width = 120
+        }
+      },
+
+      f:row {
+        enabled = bind('enableBracketStacking'),
+        f:static_text {
+          title = 'Individual Stack Color Label:',
+          width = 200,
+          alignment = 'right'
+        },
+        f:popup_menu {
+          value = bind('individualStackColorLabel'),
+          items = createColorItems(),
+          immediate = true,
+          width = 120
+        }
       },
 
       f:checkbox {
-        title = 'Put middle exposure on top',
-        value = bind('middleExposureOnTop')
+        enabled = bind('enableBracketStacking'),
+        title = 'Handle Incomplete Brackets',
+        value = bind('handleIncompleteBrackets')
+      },
+
+      f:checkbox {
+        enabled = bind {
+          keys = {'enableBracketStacking', 'handleIncompleteBrackets'},
+          operation = function(binder, values)
+            return values.enableBracketStacking and values.handleIncompleteBrackets
+          end
+        },
+        title = 'Merge Incomplete Attempts',
+        value = bind('mergeIncompleteAttempts')
       }
     },
 
     f:spacer { height = 10 },
 
+    -- Preview Settings
     f:group_box {
-      title = 'Preview',
+      title = 'Preview Settings',
       fill_horizontal = 1,
       spacing = f:control_spacing(),
 
       f:checkbox {
-        title = 'Show preview before stacking',
+        enabled = bind('enableBracketStacking'),
+        title = 'Show Preview Before Stacking',
         value = bind('showBracketPreview')
       },
 
-      f:row {
-        enabled = bind('showBracketPreview'),
-        f:static_text {
-          title = 'Preview delay (sec):',
-          width = 150,
-          alignment = 'right'
-        },
-        f:edit_field {
-          value = bind('previewDelay'),
-          width_in_chars = 8,
-          immediate = true
-        }
+      f:checkbox {
+        enabled = bind('enableBracketStacking'),
+        title = 'Highlight Potential Issues',
+        value = bind('highlightPotentialIssues')
+      },
+
+      f:checkbox {
+        enabled = bind('enableBracketStacking'),
+        title = 'Auto-Refresh Preview',
+        value = bind('autoRefreshPreview')
       }
     }
   }
 
+  -- Create the tab view
   local tabView = f:tab_view {
     f:tab_view_item {
       title = 'General',
+      identifier = 'general',
       generalTab
     },
     f:tab_view_item {
       title = 'Bracket Stacking',
+      identifier = 'bracket_stacking',
       bracketTab
     }
   }
@@ -1335,12 +1538,7 @@ return function(context)
 
     f:spacer { height = 10 },
     
-    -- Two-column layout
-    f:row {
-      spacing = 15,
-      leftColumn,
-      rightColumn
-    },
+    tabView,
 
     f:spacer { height = 10 },
 
@@ -1355,8 +1553,6 @@ return function(context)
         action = exportPrefs
       }
     }
-
-    tabView
   }
   
   -- Initial validation
