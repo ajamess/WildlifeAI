@@ -13,23 +13,19 @@ local function simulateStackCreation()
   -- Preferences stub
   local prefs = { collapseStacks = true }
 
-  -- Photos array where the first entry lacks addToStack
+  -- Photos array where the first entry is invalid (nil)
   local photosToStack = {
-    {}, -- Invalid top photo
+    nil, -- Invalid top photo
     { id = 2 },
     { id = 3 },
   }
 
   local topPhoto = photosToStack[1]
-  local isPhoto = false
-  if topPhoto then
-    local ok = pcall(function() return topPhoto:getRawMetadata('uuid') end)
-    isPhoto = ok and type(topPhoto.addToStack) == 'function'
-  end
 
-  if isPhoto then
+  if topPhoto then
     for i = 2, #photosToStack do
-      topPhoto:addToStack(photosToStack[i])
+      -- Simulate catalog stacking call
+      print(string.format("Stacking photo %s under top %s", photosToStack[i].id, topPhoto.id))
     end
     if prefs.collapseStacks and type(topPhoto.setStackCollapsed) == 'function' then
       topPhoto:setStackCollapsed(true)

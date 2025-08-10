@@ -75,6 +75,7 @@ LrTasks.startAsyncTask(function()
         local info = {
           photoId = uuid,
           fileName = fileName
+
         }
         table.insert(basicPhotoInfo, info)
         Log.debug("Basic info for photo " .. i .. ": ID=" .. tostring(info.photoId))
