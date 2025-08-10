@@ -41,30 +41,31 @@ if #photos == 1 then
   return
 end
 
--- Validate preferences before proceeding
 local isValid, errors = BracketStacking.validatePreferences(prefs)
 if not isValid then
-  LrDialogs.message('Configuration Error', 
+  LrDialogs.message('Configuration Error',
     'Please fix the following configuration issues:\n\n' .. table.concat(errors, '\n'), 'error')
   return
 end
 
--- CRITICAL: Extract ALL photo metadata OUTSIDE of any async task context
--- This is the only way to avoid yielding restrictions in Lightroom
-Log.info("=== EXTRACTING PHOTO METADATA OUTSIDE ASYNC TASK ===")
-local photoMetadata = BracketStacking.extractPhotoMetadata(photos)
-
-if not photoMetadata or #photoMetadata == 0 then
-  LrDialogs.message('Metadata Extraction Failed', 
-    'Could not extract photo metadata. All photos failed to process.', 'error')
-  return
-end
-
-Log.info("Successfully extracted metadata for " .. #photoMetadata .. " photos")
-
--- NOW start the async task with the pre-extracted metadata
+-- Start async task and extract metadata within proper task context
 LrTasks.startAsyncTask(function()
-  
+
+  local photoMetadata
+
+  catalog:withReadAccessDo(function()
+    Log.info("=== EXTRACTING PHOTO METADATA ===")
+    photoMetadata = BracketStacking.extractPhotoMetadata(photos)
+  end)
+
+  if not photoMetadata or #photoMetadata == 0 then
+    LrDialogs.message('Metadata Extraction Failed',
+      'Could not extract photo metadata. All photos failed to process.', 'error')
+    return
+  end
+
+  Log.info("Successfully extracted metadata for " .. #photoMetadata .. " photos")
+
   local success, err = pcall(function()
     Log.info("Starting bracket detection with pcall protection")
     
