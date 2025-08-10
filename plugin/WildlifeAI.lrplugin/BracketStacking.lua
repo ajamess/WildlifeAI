@@ -166,16 +166,13 @@ function BracketStacking.extractPhotoMetadata(photos)
         local timestamp = getPhotoTimestamp(photo)
         local exposureValue = getExposureValue(photo)
         local orientation = getOrientation(photo)
-        local fileName = photo:getFormattedMetadata('fileName') or 'Unknown'
-        local photoId = photo:getRawMetadata('uuid') or photo:getFormattedMetadata('uuid') or tostring(i)
+        local uuid = photo:getRawMetadata('uuid') or photo:getFormattedMetadata('uuid') or tostring(i)
 
         return {
-          photoId = photoId,  -- Store ID instead of photo object
-          photoIndex = i,     -- Store original index for re-resolution
+          uuid = uuid,
           timestamp = timestamp,
           exposureValue = exposureValue,
-          orientation = orientation,
-          fileName = fileName
+          orientation = orientation
         }
       end)
 
@@ -183,22 +180,20 @@ function BracketStacking.extractPhotoMetadata(photos)
         Log.warning(string.format("Failed to process photo %d: %s", i, tostring(data)))
         -- Create fallback data with photo ID
         data = {
-          photoId = tostring(i),
-          photoIndex = i,
+          uuid = tostring(i),
           timestamp = os.time(),
           exposureValue = nil,
-          orientation = 'horizontal',
-          fileName = 'Unknown'
+          orientation = 'horizontal'
         }
       end
 
       if data.timestamp == 0 then
-        Log.warning(string.format("Missing timestamp metadata for photo %d: %s", i, data.fileName))
+        Log.warning(string.format("Missing timestamp metadata for photo %d (UUID: %s)", i, data.uuid))
         data.timestamp = os.time()
       end
 
-      Log.debug(string.format("Photo %d: %s (ID: %s) - timestamp: %s, EV: %s, orientation: %s",
-        i, data.fileName, data.photoId, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
+      Log.debug(string.format("Photo %d: UUID=%s - timestamp: %s, EV: %s, orientation: %s",
+        i, data.uuid, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
 
       table.insert(photoData, data)
     else
@@ -649,19 +644,14 @@ function BracketStacking.detectBrackets(photos, progressCallback)
 end
 
 -- Create stacks from detected brackets
-function BracketStacking.createStacks(detectionResults, originalPhotos, progressCallback)
+function BracketStacking.createStacks(detectionResults, progressCallback)
   local prefs = LrPrefs.prefsForPlugin()
   local catalog = LrApplication.activeCatalog()
-  
+
   if not detectionResults or not detectionResults.sequences then
     return false, "No detection results provided"
   end
-  
-  -- We'll get fresh photos within the write context, originalPhotos is just for count validation
-  if not originalPhotos or #originalPhotos == 0 then
-    return false, "No original photos provided for stack creation"
-  end
-  
+
   local sequences = detectionResults.sequences
   local stacksCreated = 0
   local totalBrackets = 0
@@ -690,41 +680,32 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
   end
   
   catalog:withWriteAccessDo('Create Bracket Stacks', function()
-    -- Get fresh photo objects within the write context
-    local freshPhotos = catalog:getTargetPhotos()
-    Log.info("Got " .. #freshPhotos .. " fresh photos in write context")
-    
-    -- Test if fresh photos have the required methods
-    if freshPhotos[1] then
-      Log.info("Fresh photo addToStack method: " .. type(freshPhotos[1].addToStack))
-    end
-    
     for _, sequence in ipairs(sequences) do
       for _, bracket in ipairs(sequence.brackets) do
         currentBracket = currentBracket + 1
-        
+
         if #bracket.photos >= 2 then
           -- Call progress callback before photo operations to avoid yielding issues
-          safeProgressCallback(currentBracket / totalBrackets, 
+          safeProgressCallback(currentBracket / totalBrackets,
             "Creating stack " .. currentBracket .. " of " .. totalBrackets)
-          
-          -- Re-resolve photo objects from fresh photo array using stored indices
+
+          -- Resolve photo objects by UUID inside write access
           local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
-            local photo = freshPhotos[photoData.photoIndex]
+            local photo = catalog:findPhotoByUuid(photoData.uuid)
             if photo and type(photo.addToStack) == 'function' then
               table.insert(resolvedPhotos, {
                 photo = photo,
                 photoData = photoData
               })
             else
-              Log.warning(string.format("Could not resolve photo %s (index %d) for stacking", 
-                photoData.fileName, photoData.photoIndex))
+              Log.warning(string.format("Could not resolve photo UUID %s for stacking",
+                tostring(photoData.uuid)))
             end
           end
-          
+
           if #resolvedPhotos < 2 then
-            Log.warning(string.format("Skipping bracket %d: only %d valid photos resolved", 
+            Log.warning(string.format("Skipping bracket %d: only %d valid photos resolved",
               currentBracket, #resolvedPhotos))
           else
             -- Remove any existing stacks first
@@ -733,10 +714,10 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
                 resolved.photo:removeFromStack()
               end
             end
-            
+
             -- Determine top photo based on preferences
             local topResolved = resolvedPhotos[1] -- Default to first
-            
+
             if prefs.individualStackTopSelection == 'middle_exposure' and #resolvedPhotos >= 3 then
               local middleIndex = math.ceil(#resolvedPhotos / 2)
               topResolved = resolvedPhotos[middleIndex]
@@ -760,8 +741,8 @@ function BracketStacking.createStacks(detectionResults, originalPhotos, progress
             end
 
             local topPhoto = topResolved.photo
-            Log.debug(string.format("Selected top photo for bracket %d: %s (type=%s, addToStack=%s)", 
-              currentBracket, topResolved.photoData.fileName, type(topPhoto), type(topPhoto.addToStack)))
+            Log.debug(string.format("Selected top photo for bracket %d: UUID=%s (type=%s, addToStack=%s)",
+              currentBracket, topResolved.photoData.uuid, type(topPhoto), type(topPhoto.addToStack)))
 
             -- Create the stack using catalog method (more reliable than photo method)
             for _, resolved in ipairs(resolvedPhotos) do
