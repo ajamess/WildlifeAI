@@ -610,33 +610,42 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           end
           
           -- Create the stack
-          for _, photoData in ipairs(bracket.photos) do
-            if photoData.photo ~= topPhoto then
-              topPhoto:addToStack(photoData.photo)
-            end
-          end
-          
-          -- Apply color label based on stack type
-          local colorLabel = nil
-          if bracket.type == 'panorama' then
-            colorLabel = prefs.panoramaStackColorLabel
+          if not (topPhoto and type(topPhoto.addToStack) == 'function') then
+            Log.warning('Top photo is invalid or missing addToStack; skipping this bracket')
           else
-            colorLabel = prefs.individualStackColorLabel
+            for _, photoData in ipairs(bracket.photos) do
+              local photo = photoData.photo
+              if photo ~= topPhoto then
+                if photo and type(photo.addToStack) == 'function' then
+                  topPhoto:addToStack(photo)
+                else
+                  Log.warning('Skipping invalid photo without addToStack in bracket')
+                end
+              end
+            end
+
+            -- Apply color label based on stack type
+            local colorLabel = nil
+            if bracket.type == 'panorama' then
+              colorLabel = prefs.panoramaStackColorLabel
+            else
+              colorLabel = prefs.individualStackColorLabel
+            end
+
+            if colorLabel and colorLabel ~= 'none' then
+              topPhoto:setRawMetadata('colorNameForLabel', colorLabel)
+            end
+
+            -- Collapse stack if it's part of a larger panorama sequence
+            if sequence.type == 'panorama' and #sequence.brackets > 1 then
+              topPhoto:setStackCollapsed(true)
+            end
+
+            stacksCreated = stacksCreated + 1
+
+            Log.debug(string.format("Created %s stack with %d photos (confidence: %d%%)",
+              bracket.type, #bracket.photos, bracket.confidence))
           end
-          
-          if colorLabel and colorLabel ~= 'none' then
-            topPhoto:setRawMetadata('colorNameForLabel', colorLabel)
-          end
-          
-          -- Collapse stack if it's part of a larger panorama sequence
-          if sequence.type == 'panorama' and #sequence.brackets > 1 then
-            topPhoto:setStackCollapsed(true)
-          end
-          
-          stacksCreated = stacksCreated + 1
-          
-          Log.debug(string.format("Created %s stack with %d photos (confidence: %d%%)", 
-            bracket.type, #bracket.photos, bracket.confidence))
         end
       end
     end
