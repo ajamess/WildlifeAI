@@ -66,6 +66,7 @@ LrTasks.startAsyncTask(function()
       local photos = catalog:getTargetPhotos()
       Log.info("Got " .. #photos .. " photos")
 
+      -- extractPhotoMetadata performs its own batched metadata retrieval
       photoMetadata = BracketStacking.extractPhotoMetadata(photos)
 
     end)

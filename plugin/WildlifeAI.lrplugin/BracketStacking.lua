@@ -16,8 +16,8 @@ local BracketStacking = {}
 local EPSILON = 0.001 -- For floating point comparisons
 
 -- Helper function to get photo timestamp
-local function getPhotoTimestamp(photo)
-  local dateTime = photo:getRawMetadata("dateTime")
+local function getPhotoTimestamp(meta)
+  local dateTime = meta.dateTime
   if type(dateTime) == "table" and dateTime.timeInSeconds then
     return dateTime:timeInSeconds()
   elseif type(dateTime) == "number" then
@@ -50,58 +50,46 @@ local function parseExposureValue(value)
   return nil
 end
 
-local function getExposureValue(photo)
-  local success, result = pcall(function()
-    -- Try multiple EXIF field names for different camera formats
-    local aperture = parseExposureValue(photo:getRawMetadata('aperture'))
-    local shutterSpeed = parseExposureValue(photo:getRawMetadata('shutterSpeed'))
-    local iso = parseExposureValue(photo:getRawMetadata('isoSpeedRating'))
-    
-    -- Try alternative field names if primary ones fail
-    if not aperture then
-      aperture = parseExposureValue(photo:getRawMetadata('fNumber'))
-        or parseExposureValue(photo:getRawMetadata('fnumber'))
-        or parseExposureValue(photo:getRawMetadata('apertureValue'))
-    end
-    
-    if not shutterSpeed then
-      shutterSpeed = parseExposureValue(photo:getRawMetadata('exposureTime'))
-        or parseExposureValue(photo:getRawMetadata('shutterSpeedValue'))
-        or parseExposureValue(photo:getRawMetadata('exposuretime'))
-    end
-    
-    if not iso then
-      iso = parseExposureValue(photo:getRawMetadata('iso'))
-        or parseExposureValue(photo:getRawMetadata('isoSpeedRatings'))
-        or parseExposureValue(photo:getRawMetadata('photographicSensitivity'))
-    end
+local function getExposureValue(meta)
+  -- Try multiple EXIF field names for different camera formats
+  local aperture = parseExposureValue(meta.aperture)
+  local shutterSpeed = parseExposureValue(meta.shutterSpeed)
+  local iso = parseExposureValue(meta.isoSpeedRating)
 
-    -- Debug logging for EXIF data extraction
-    Log.debug(string.format("EXIF data - aperture: %s, shutterSpeed: %s, iso: %s", 
-      tostring(aperture), tostring(shutterSpeed), tostring(iso)))
-
-    if aperture and shutterSpeed and iso and aperture > 0 and shutterSpeed > 0 and iso > 0 then
-      -- Calculate EV using standard formula: EV = log2(aperture²/shutterSpeed) + log2(iso/100)
-      local ev = math.log(aperture * aperture / shutterSpeed, 2) + math.log(iso / 100, 2)
-      Log.debug(string.format("Calculated EV: %.2f (f/%.1f, 1/%.0fs, ISO%d)", 
-        ev, aperture, 1/shutterSpeed, iso))
-      return ev
-    else
-      Log.debug("Insufficient EXIF data for EV calculation")
-      return nil
-    end
-  end)
-
-  if not success then
-    Log.debug("Error in getExposureValue: " .. tostring(result))
+  -- Try alternative field names if primary ones fail
+  if not aperture then
+    aperture = parseExposureValue(meta.fNumber)
   end
-  
-  return success and result or nil
+
+  if not shutterSpeed then
+    shutterSpeed = parseExposureValue(meta.exposureTime)
+  end
+
+  if not iso then
+    iso = parseExposureValue(meta.iso)
+      or parseExposureValue(meta.isoSpeedRatings)
+      or parseExposureValue(meta.photographicSensitivity)
+  end
+
+  -- Debug logging for EXIF data extraction
+  Log.debug(string.format("EXIF data - aperture: %s, shutterSpeed: %s, iso: %s",
+    tostring(aperture), tostring(shutterSpeed), tostring(iso)))
+
+  if aperture and shutterSpeed and iso and aperture > 0 and shutterSpeed > 0 and iso > 0 then
+    -- Calculate EV using standard formula: EV = log2(aperture²/shutterSpeed) + log2(iso/100)
+    local ev = math.log(aperture * aperture / shutterSpeed, 2) + math.log(iso / 100, 2)
+    Log.debug(string.format("Calculated EV: %.2f (f/%.1f, 1/%.0fs, ISO%d)",
+      ev, aperture, 1/shutterSpeed, iso))
+    return ev
+  else
+    Log.debug("Insufficient EXIF data for EV calculation")
+    return nil
+  end
 end
 
 -- Helper function to get orientation
-local function getOrientation(photo)
-  local orientation = photo:getRawMetadata('orientation')
+local function getOrientation(meta)
+  local orientation = meta.orientation
   if orientation and (orientation == 'AB' or orientation == 'CD') then
     return 'vertical'
   end
@@ -112,95 +100,39 @@ end
 function BracketStacking.extractPhotoMetadata(photos)
   Log.info("=== EXTRACTING PHOTO METADATA ===")
   Log.info("Total photos received: " .. #photos)
-  
+
   local photoData = {}
-  
-  -- Process all photos and extract metadata safely WITHOUT any task wrappers
-  for i, photo in ipairs(photos) do
-    -- ENHANCED DIAGNOSTIC LOGGING
-    Log.info(string.format("=== PHOTO %d DEEP INSPECTION ===", i))
-    Log.info(string.format("Photo object type: %s", type(photo)))
-    Log.info(string.format("Photo object is nil: %s", tostring(photo == nil)))
-    
-    if photo then
-      -- Log all available methods and properties
-      Log.info("Available photo object methods/properties:")
-      local methodCount = 0
-      for key, value in pairs(photo) do
-        Log.info(string.format("  %s: %s", tostring(key), type(value)))
-        methodCount = methodCount + 1
-        if methodCount > 20 then -- Limit output to avoid overwhelming logs
-          Log.info("  ... (truncated - more than 20 properties)")
-          break
-        end
-      end
-      
-      -- Test specific critical methods
-      Log.info("Critical method availability:")
-      Log.info(string.format("  addToStack: %s", type(photo.addToStack)))
-      Log.info(string.format("  getRawMetadata: %s", type(photo.getRawMetadata)))
-      Log.info(string.format("  getFormattedMetadata: %s", type(photo.getFormattedMetadata)))
-      Log.info(string.format("  removeFromStack: %s", type(photo.removeFromStack)))
-      Log.info(string.format("  setRawMetadata: %s", type(photo.setRawMetadata)))
-      
-      -- Try to get basic metadata to test if object is functional
-      local testSuccess, testResult = pcall(function()
-        local fileName = photo:getFormattedMetadata('fileName')
-        local uuid = photo:getRawMetadata('uuid')
-        return { fileName = fileName, uuid = uuid }
-      end)
-      
-      Log.info(string.format("Basic metadata test - Success: %s", tostring(testSuccess)))
-      if testSuccess and testResult then
-        Log.info(string.format("  File name: %s", tostring(testResult.fileName)))
-        Log.info(string.format("  UUID: %s", tostring(testResult.uuid)))
-      else
-        Log.warning(string.format("  Error: %s", tostring(testResult)))
-      end
+  if #photos == 0 then
+    return photoData
+  end
+
+  local catalog = LrApplication.activeCatalog()
+  local fields = {
+    'uuid','dateTime','aperture','shutterSpeed','isoSpeedRating','fNumber',
+    'exposureTime','orientation','iso','isoSpeedRatings','photographicSensitivity'
+  }
+  local batch = catalog:batchGetRawMetadata(photos, fields)
+
+  for i, meta in ipairs(batch) do
+    meta = meta or {}
+    local timestamp = getPhotoTimestamp(meta)
+    if not timestamp or timestamp == 0 then
+      Log.warning(string.format("Missing timestamp metadata for photo %d", i))
+      timestamp = os.time()
     end
-    
-    -- Verify photo object validity first
-    if photo ~= nil then
-      -- Extract metadata using plain pcall (no LrTasks wrapper)
-      local success, data = pcall(function()
-        local timestamp = getPhotoTimestamp(photo)
-        local exposureValue = getExposureValue(photo)
-        local orientation = getOrientation(photo)
-        local uuid = photo:getRawMetadata('uuid') or photo:getFormattedMetadata('uuid') or tostring(i)
 
-        -- Store UUID-based identifier with extracted metadata
-        return {
-          uuid = uuid,
+    local data = {
+      uuid = meta.uuid or tostring(i),
+      timestamp = timestamp,
+      exposureValue = getExposureValue(meta),
+      orientation = getOrientation(meta)
+    }
 
-          timestamp = timestamp,
-          exposureValue = exposureValue,
-          orientation = orientation
-        }
-      end)
+    Log.debug(string.format(
+      "Photo %d: UUID=%s - timestamp: %s, EV: %s, orientation: %s",
+      i, data.uuid, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
 
-      if not success or not data then
-        Log.warning(string.format("Failed to process photo %d: %s", i, tostring(data)))
-        -- Create fallback data with photo ID
-        data = {
-          uuid = tostring(i),
-          timestamp = os.time(),
-          exposureValue = nil,
-          orientation = 'horizontal'
-        }
-      end
-
-      if data.timestamp == 0 then
-        Log.warning(string.format("Missing timestamp metadata for photo %d (UUID: %s)", i, data.uuid))
-        data.timestamp = os.time()
-      end
-
-      Log.debug(string.format("Photo %d: UUID=%s - timestamp: %s, EV: %s, orientation: %s",
-        i, data.uuid, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
-
-      table.insert(photoData, data)
-    else
-      Log.warning(string.format("Photo %d is nil - skipping", i))
-    end
+    table.insert(photoData, data)
   end
   
   -- Sort by timestamp
