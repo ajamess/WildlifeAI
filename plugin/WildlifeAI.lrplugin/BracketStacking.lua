@@ -6,6 +6,7 @@ local LrApplication = import 'LrApplication'
 local LrPrefs = import 'LrPrefs'
 local LrPathUtils = import 'LrPathUtils'
 local LrProgressScope = import 'LrProgressScope'
+local LrTasks = import 'LrTasks'
 
 local Log = dofile( LrPathUtils.child(_PLUGIN.path, 'utils/Log.lua') )
 
@@ -57,7 +58,7 @@ function BracketStacking.extractPhotoMetadata(photos)
   
   -- Process all photos and extract metadata safely
   for i, photo in ipairs(photos) do
-    local success, data = pcall(function()
+    local success, data = LrTasks.pcall(function()
       local timestamp = getPhotoTimestamp(photo)
       local exposureValue = getExposureValue(photo)
       local orientation = getOrientation(photo)
