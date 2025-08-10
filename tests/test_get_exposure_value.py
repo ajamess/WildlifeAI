@@ -1,4 +1,5 @@
 import math
+import math
 from lupa import LuaRuntime
 
 
@@ -10,6 +11,8 @@ def load_module():
         'return { child = function(base, child) return base .. "/" .. child end } '
         'elseif name == "LrTasks" then '
         'return { pcall = pcall } '
+        'elseif name == "LrApplication" then '
+        'return { activeCatalog = function() return { batchGetRawMetadata = function(_, photos, keys) local res = {} for i, p in ipairs(photos) do res[i] = {} for _, k in ipairs(keys) do res[i][k] = p.raw[k] end end return res end } end } '
         'else return {} end end'
     )
     lua.execute("_PLUGIN={path='plugin/WildlifeAI.lrplugin'}")
