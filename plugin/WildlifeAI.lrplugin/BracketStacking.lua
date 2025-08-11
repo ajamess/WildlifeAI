@@ -96,57 +96,132 @@ local function getOrientation(meta)
   return 'horizontal'
 end
 
--- Extract photo metadata outside of any async context
-function BracketStacking.extractPhotoMetadata(photos)
-  Log.info("=== EXTRACTING PHOTO METADATA ===")
-  Log.info("Total photos received: " .. #photos)
-
+-- NEW: Individual metadata extraction using proven working pattern from Analytics.lua
+function BracketStacking.extractPhotoMetadataSafe(photos)
+  Log.info("=== INDIVIDUAL METADATA EXTRACTION (PROVEN PATTERN) ===")
+  Log.info(string.format("Input: %d photos to process", #photos))
+  Log.info("Context: Async task - using individual photo:getRawMetadata() calls")
+  Log.info("Pattern: Same as Analytics.lua and SmartBridge.lua (proven working)")
+  
   local photoData = {}
+  
   if #photos == 0 then
-    return photoData
+    Log.warning("No photos provided to extractPhotoMetadataSafe")
+    return photoData, true -- Return success even if no photos
   end
 
-  local catalog = LrApplication.activeCatalog()
-  local fields = {
-    'uuid','dateTime','aperture','shutterSpeed','isoSpeedRating','fNumber',
-    'exposureTime','orientation','iso','isoSpeedRatings','photographicSensitivity'
-  }
-  local batch = catalog:batchGetRawMetadata(photos, fields)
-
-  for i, meta in ipairs(batch) do
-    meta = meta or {}
+  -- Process each photo individually using the proven working pattern
+  Log.info("=== STARTING INDIVIDUAL METADATA EXTRACTION ===")
+  Log.info("Using individual photo:getRawMetadata() calls (no yielding issues)")
+  
+  for i, photo in ipairs(photos) do
+    Log.debug(string.format("Extracting metadata for photo %d/%d...", i, #photos))
+    
+    -- Extract metadata using individual calls (proven working pattern)
+    local photoPath = photo:getRawMetadata('path') or ''
+    local uuid = photo:getRawMetadata('uuid') or string.format("photo_%d_%d", i, os.time())
+    local dateTime = photo:getRawMetadata('dateTime')
+    local aperture = photo:getRawMetadata('aperture')
+    local shutterSpeed = photo:getRawMetadata('shutterSpeed')
+    local isoSpeedRating = photo:getRawMetadata('isoSpeedRating')
+    local fNumber = photo:getRawMetadata('fNumber')
+    local exposureTime = photo:getRawMetadata('exposureTime')
+    local orientation = photo:getRawMetadata('orientation')
+    local iso = photo:getRawMetadata('iso')
+    local isoSpeedRatings = photo:getRawMetadata('isoSpeedRatings')
+    local photographicSensitivity = photo:getRawMetadata('photographicSensitivity')
+    
+    -- Build metadata object
+    local meta = {
+      uuid = uuid,
+      dateTime = dateTime,
+      aperture = aperture,
+      shutterSpeed = shutterSpeed,
+      isoSpeedRating = isoSpeedRating,
+      fNumber = fNumber,
+      exposureTime = exposureTime,
+      orientation = orientation,
+      iso = iso,
+      isoSpeedRatings = isoSpeedRatings,
+      photographicSensitivity = photographicSensitivity
+    }
+    
+    -- Log metadata availability for first few photos
+    if i <= 3 then
+      local metaFields = {}
+      for field, value in pairs(meta) do
+        if value then
+          table.insert(metaFields, string.format("%s=%s", field, tostring(value)))
+        end
+      end
+      Log.debug(string.format("Photo %d metadata fields: [%s]", i, table.concat(metaFields, ', ')))
+    end
+    
+    -- Extract and validate timestamp
     local timestamp = getPhotoTimestamp(meta)
     if not timestamp or timestamp == 0 then
-      Log.warning(string.format("Missing timestamp metadata for photo %d", i))
+      Log.warning(string.format("Photo %d: Missing or invalid timestamp, using current time", i))
       timestamp = os.time()
     end
-
+    
+    -- Extract exposure value with detailed logging
+    local exposureValue = getExposureValue(meta)
+    if exposureValue then
+      Log.debug(string.format("Photo %d: Extracted EV = %.2f", i, exposureValue))
+    else
+      Log.debug(string.format("Photo %d: No exposure value available", i))
+    end
+    
+    -- Create metadata record
     local data = {
-      uuid = meta.uuid or tostring(i),
+      uuid = uuid,
       timestamp = timestamp,
-      exposureValue = getExposureValue(meta),
-      orientation = getOrientation(meta)
+      exposureValue = exposureValue,
+      orientation = getOrientation(meta),
+      photoIndex = i,  -- Add original index for debugging
+      photoPath = photoPath  -- Store path for reference
     }
-
-    Log.debug(string.format(
-      "Photo %d: UUID=%s - timestamp: %s, EV: %s, orientation: %s",
-      i, data.uuid, tostring(data.timestamp), tostring(data.exposureValue), data.orientation))
-
+    
     table.insert(photoData, data)
+    
+    Log.debug(string.format("Photo %d processed: UUID=%s, timestamp=%s, EV=%s, orientation=%s",
+      i, data.uuid, os.date("%H:%M:%S", data.timestamp), 
+      tostring(data.exposureValue), data.orientation))
   end
   
-  -- Sort by timestamp
+  Log.info(string.format("✓ All %d metadata records processed successfully", #photoData))
+  
+  -- Sort by timestamp with logging
+  Log.info("=== SORTING PHOTOS BY TIMESTAMP ===")
   table.sort(photoData, function(a, b)
     return a.timestamp < b.timestamp
   end)
   
   if #photoData > 0 then
-    Log.info("Photos sorted by time - first: " .. os.date("%H:%M:%S", photoData[1].timestamp) .. 
-      ", last: " .. os.date("%H:%M:%S", photoData[#photoData].timestamp))
+    Log.info(string.format("✓ Photos sorted by time: %s to %s", 
+      os.date("%H:%M:%S", photoData[1].timestamp),
+      os.date("%H:%M:%S", photoData[#photoData].timestamp)))
+      
+    -- Log time gaps for first few photos
+    for i = 2, math.min(4, #photoData) do
+      local gap = photoData[i].timestamp - photoData[i-1].timestamp
+      Log.debug(string.format("Time gap %d->%d: %.1f seconds", i-1, i, gap))
+    end
   end
   
-  Log.info(string.format("Successfully extracted metadata for %d photos", #photoData))
+  Log.info("=== INDIVIDUAL METADATA EXTRACTION COMPLETED SUCCESSFULLY ===")
+  Log.info(string.format("✓ Total records extracted: %d", #photoData))
+  Log.info(string.format("✓ Success rate: 100%% (%d/%d photos)", #photoData, #photos))
   
+  return photoData, true
+end
+
+-- Legacy metadata extraction function (kept for compatibility)
+function BracketStacking.extractPhotoMetadata(photos)
+  Log.info("=== LEGACY METADATA EXTRACTION (DEPRECATED) ===")
+  Log.warning("Using deprecated extractPhotoMetadata - consider using extractPhotoMetadataSafe")
+  
+  local photoData, success = BracketStacking.extractPhotoMetadataSafe(photos)
   return photoData
 end
 
@@ -458,13 +533,138 @@ local function handleIncompleteBrackets(sequences, prefs)
   return sequences
 end
 
+-- Simple bracket detection function that works without metadata (no yielding)
+function BracketStacking.detectBracketsSimple(photos, progressCallback)
+  local prefs = LrPrefs.prefsForPlugin()
+  
+  Log.info("=== SIMPLE BRACKET DETECTION (NO METADATA) ===")
+  Log.info("Context: Async task, NO metadata extraction - completely safe")
+  Log.info(string.format("Input: %d photo objects", #photos))
+  Log.info("Using index-based grouping to avoid all yielding issues")
+  
+  if not prefs.enableBracketStacking then
+    Log.warning("Bracket stacking is disabled - returning empty results")
+    return { sequences = {}, stats = { totalPhotos = #photos, processedPhotos = 0 } }
+  end
+  
+  -- Get bracket size from preferences
+  local bracketSize = prefs.defaultBracketSize
+  if bracketSize == 'custom' then
+    bracketSize = prefs.customBracketSize or 3
+  end
+  bracketSize = tonumber(bracketSize) or 3
+  
+  Log.info("Simple detection preferences:")
+  Log.info("  - bracketSize: " .. tostring(bracketSize))
+  Log.info("  - totalPhotos: " .. tostring(#photos))
+  
+  -- Safe progress callback wrapper
+  local function safeProgressCallback(progress, status)
+    if progressCallback then
+      local success, err = pcall(progressCallback, progress, status)
+      if not success then
+        Log.warning("Progress callback failed: " .. tostring(err))
+      end
+    end
+  end
+  
+  safeProgressCallback(0.3, "Creating simple bracket groups...")
+  
+  -- Create simple bracket groups based on index position
+  local brackets = {}
+  local photoIndex = 1
+  
+  while photoIndex <= #photos do
+    local bracketPhotos = {}
+    
+    -- Group photos by bracket size
+    for i = 0, bracketSize - 1 do
+      if photoIndex + i <= #photos then
+        -- Create minimal photo data structure
+        table.insert(bracketPhotos, {
+          uuid = "simple_" .. (photoIndex + i), -- Temporary UUID for grouping
+          photoIndex = photoIndex + i,
+          photo = photos[photoIndex + i] -- Store the actual photo object
+        })
+      end
+    end
+    
+    if #bracketPhotos >= 2 then -- At least 2 photos needed for a stack
+      table.insert(brackets, {
+        photos = bracketPhotos,
+        size = #bracketPhotos,
+        confidence = 75, -- Medium confidence for simple detection
+        type = 'individual'
+      })
+      
+      Log.debug(string.format("Created simple bracket %d with %d photos (positions %d-%d)",
+        #brackets, #bracketPhotos, photoIndex, photoIndex + #bracketPhotos - 1))
+    end
+    
+    photoIndex = photoIndex + bracketSize
+  end
+  
+  safeProgressCallback(0.6, "Organizing bracket sequences...")
+  
+  -- Create a single sequence containing all brackets
+  local sequences = {}
+  if #brackets > 0 then
+    table.insert(sequences, {
+      type = 'individual',
+      brackets = brackets,
+      sequenceId = 1
+    })
+  end
+  
+  safeProgressCallback(0.9, "Calculating statistics...")
+  
+  -- Calculate statistics
+  local stats = {
+    totalPhotos = #photos,
+    processedPhotos = 0,
+    totalSequences = #sequences,
+    panoramaSequences = 0,
+    individualSequences = #sequences,
+    totalStacks = #brackets,
+    unmatchedPhotos = #photos
+  }
+  
+  for _, bracket in ipairs(brackets) do
+    stats.processedPhotos = stats.processedPhotos + bracket.size
+  end
+  
+  stats.unmatchedPhotos = stats.totalPhotos - stats.processedPhotos
+  
+  safeProgressCallback(1.0, "Detection complete")
+  
+  Log.info(string.format("Simple bracket detection complete: %d sequences, %d stacks, %d/%d photos processed", 
+    stats.totalSequences, stats.totalStacks, stats.processedPhotos, stats.totalPhotos))
+  
+  return {
+    sequences = sequences,
+    stats = stats
+  }
+end
+
 -- New bracket detection function that works with pre-extracted metadata
 function BracketStacking.detectBracketsFromMetadata(photoData, progressCallback)
   local prefs = LrPrefs.prefsForPlugin()
   
-  Log.info("=== BRACKET DETECTION FROM METADATA STARTED ===")
-  Log.info("Total photo metadata records to analyze: " .. #photoData)
+  Log.info("=== BRACKET DETECTION FROM CACHED METADATA ===")
+  Log.info("Context: Async task, using cached data only - NO metadata calls")
+  Log.info(string.format("Input: %d cached metadata records", #photoData))
   Log.info("Bracket stacking enabled: " .. tostring(prefs.enableBracketStacking))
+  
+  -- Log data availability
+  local hasTimestamps = 0
+  local hasExposureData = 0
+  for _, data in ipairs(photoData) do
+    if data.timestamp then hasTimestamps = hasTimestamps + 1 end
+    if data.exposureValue then hasExposureData = hasExposureData + 1 end
+  end
+  
+  Log.info(string.format("Data quality: %d/%d have timestamps, %d/%d have exposure data", 
+    hasTimestamps, #photoData, hasExposureData, #photoData))
   
   if not prefs.enableBracketStacking then
     Log.warning("Bracket stacking is disabled - returning empty results")
@@ -621,10 +821,23 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           safeProgressCallback(currentBracket / totalBrackets,
             "Creating stack " .. currentBracket .. " of " .. totalBrackets)
 
-          -- Resolve photo objects by UUID inside write access
+          -- Resolve photo objects (handle both UUID-based and simple detection)
           local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
-            local photo = catalog:findPhotoByUuid(photoData.uuid)
+            local photo = nil
+            
+            if photoData.photo then
+              -- Simple detection: photo object already available
+              photo = photoData.photo
+              Log.debug(string.format("Using direct photo object for position %d", 
+                photoData.photoIndex or 0))
+            elseif photoData.uuid and photoData.uuid ~= "" and not photoData.uuid:match("^simple_") then
+              -- UUID-based detection: resolve by UUID
+              photo = catalog:findPhotoByUuid(photoData.uuid)
+              Log.debug(string.format("Resolved photo by UUID: %s", photoData.uuid))
+            else
+              Log.warning(string.format("Invalid photo data: no photo object or valid UUID"))
+            end
 
             if photo and type(photo.addToStack) == 'function' then
               table.insert(resolvedPhotos, {
@@ -632,9 +845,8 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
                 photoData = photoData
               })
             else
-              Log.warning(string.format("Could not resolve photo UUID %s for stacking",
-                tostring(photoData.uuid)))
-
+              Log.warning(string.format("Could not resolve photo for stacking (UUID: %s, hasPhoto: %s)",
+                tostring(photoData.uuid), tostring(photoData.photo ~= nil)))
             end
           end
 

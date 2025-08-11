@@ -50,39 +50,51 @@ if photoCount == 1 then
   return
 end
 
-Log.info("=== STARTING ASYNC TASK FOR ALL PHOTO OPERATIONS ===")
+Log.info("=== EXTRACTING ALL METADATA IN SYNCHRONOUS CONTEXT ===")
 Log.info("Photo count: " .. photoCount)
+Log.info("CRITICAL: All metadata extraction MUST happen in sync context before async task")
 
--- CRITICAL: Use clean two-phase approach
+-- CRITICAL FIX: Extract ALL metadata in synchronous context
+local photos = {}
+local photoData = {}
+
+-- Get photos and extract metadata in single synchronous context
+catalog:withReadAccessDo(function()
+  Log.info("=== SYNCHRONOUS METADATA EXTRACTION ===")
+  Log.info("Context: withReadAccessDo - completely synchronous, no yielding issues")
+  
+  photos = catalog:getTargetPhotos()
+  Log.info(string.format("Retrieved %d target photos from catalog", #photos))
+  
+  -- Extract metadata using the safe method IN SYNCHRONOUS CONTEXT
+  photoData, _ = BracketStacking.extractPhotoMetadataSafe(photos)
+  
+  Log.info(string.format("✓ Extracted metadata for %d photos in synchronous context", #photoData))
+end)
+
+-- Validate metadata extraction
+if #photoData == 0 then
+  LrDialogs.message('Metadata Extraction Failed', 
+    'Failed to extract photo metadata. Please check the logs for details.', 'error')
+  return
+end
+
+Log.info("=== STARTING ASYNC TASK WITH PRE-EXTRACTED METADATA ===")
+Log.info("All metadata extracted - async task will use cached data only")
+
+-- ASYNC TASK WITH PRE-EXTRACTED METADATA (NO METADATA CALLS)
 LrTasks.startAsyncTask(function()
 
   local success, err = pcall(function()
-    Log.info("=== PHASE 1: EXTRACT PHOTO METADATA ===")
+    Log.info("=== ASYNC TASK STARTED ===")
+    Log.info("Context: Async task - using PRE-EXTRACTED metadata (no yielding)")
+    Log.info(string.format("Working with %d cached metadata records", #photoData))
 
-    local photoMetadata = {}
+    -- STEP 1: INTELLIGENT BRACKET DETECTION USING CACHED METADATA
+    Log.info("=== STEP 1: INTELLIGENT BRACKET DETECTION ===")
+    Log.info("Using cached metadata - NO photo object access")
 
-    catalog:withReadAccessDo(function()
-      Log.info("Getting photos in read context")
-      local photos = catalog:getTargetPhotos()
-      Log.info("Got " .. #photos .. " photos")
-
-      -- extractPhotoMetadata performs its own batched metadata retrieval
-      photoMetadata = BracketStacking.extractPhotoMetadata(photos)
-
-    end)
-
-    if #photoMetadata == 0 then
-      LrDialogs.message('Photo Info Extraction Failed',
-        'Could not extract photo metadata.', 'error')
-      return
-    end
-
-    Log.info("Successfully extracted metadata for " .. #photoMetadata .. " photos")
-
-    -- Phase 2: Perform bracket detection using metadata
-    Log.info("=== PHASE 2: DETECT BRACKETS FROM METADATA ===")
-
-    local detectionResults = BracketStacking.detectBracketsFromMetadata(photoMetadata)
+    local detectionResults = BracketStacking.detectBracketsFromMetadata(photoData)
     
     -- Check if any brackets were detected
     if not detectionResults.sequences or #detectionResults.sequences == 0 then
@@ -94,6 +106,27 @@ LrTasks.startAsyncTask(function()
         '• The bracket size settings don\'t match your sequences\n\n' ..
         'Try adjusting the detection settings in the configuration dialog.', 'info')
       return
+    end
+    
+    -- STEP 2: MAP METADATA BACK TO PHOTO OBJECTS FOR STACKING
+    Log.info("=== STEP 2: MAPPING METADATA TO PHOTOS FOR STACKING ===")
+    Log.info("Enhancing detection results with original photo objects")
+    
+    -- Enhance detection results with original photo objects
+    for _, sequence in ipairs(detectionResults.sequences) do
+      for _, bracket in ipairs(sequence.brackets) do
+        for _, photoMetadata in ipairs(bracket.photos) do
+          -- Map back to original photo using photoIndex
+          if photoMetadata.photoIndex and photos[photoMetadata.photoIndex] then
+            photoMetadata.photo = photos[photoMetadata.photoIndex]
+            Log.debug(string.format("Mapped metadata record to photo object (index %d)", 
+              photoMetadata.photoIndex))
+          else
+            Log.warning(string.format("Could not map metadata record to photo object (index %s)",
+              tostring(photoMetadata.photoIndex)))
+          end
+        end
+      end
     end
     
     -- Show preview if enabled, otherwise proceed directly to stacking
@@ -172,6 +205,7 @@ LrTasks.startAsyncTask(function()
   end)
   
   if not success then
+    Log.error("Async task error: " .. tostring(err))
     LrDialogs.message('Bracket Analysis Error', 'An error occurred during bracket analysis: ' .. tostring(err), 'error')
   end
 end)
