@@ -17,7 +17,7 @@ local EPSILON = 0.001 -- For floating point comparisons
 
 -- Safely retrieve metadata with error handling
 local function safeGetRawMetadata(photo, key)
-  local ok, result = pcall(function()
+  local ok, result = LrTasks.pcall(function()
     return photo:getRawMetadata(key)
   end)
   if ok then
