@@ -15,6 +15,20 @@ local BracketStacking = {}
 -- Constants
 local EPSILON = 0.001 -- For floating point comparisons
 
+-- Safely retrieve metadata with error handling
+local function safeGetRawMetadata(photo, key)
+  local ok, result = pcall(function()
+    return photo:getRawMetadata(key)
+  end)
+  if ok then
+    Log.debug(string.format("safeGetRawMetadata('%s') success", key))
+    return result
+  else
+    Log.warning(string.format("safeGetRawMetadata('%s') failed: %s", key, tostring(result)))
+    return nil
+  end
+end
+
 -- Helper function to get photo timestamp
 local function getPhotoTimestamp(meta)
   local dateTime = meta.dateTime
@@ -118,18 +132,30 @@ function BracketStacking.extractPhotoMetadataSafe(photos)
     Log.debug(string.format("Extracting metadata for photo %d/%d...", i, #photos))
     
     -- Extract metadata using individual calls (proven working pattern)
-    local photoPath = photo:getRawMetadata('path') or ''
-    local uuid = photo:getRawMetadata('uuid') or string.format("photo_%d_%d", i, os.time())
-    local dateTime = photo:getRawMetadata('dateTime')
-    local aperture = photo:getRawMetadata('aperture')
-    local shutterSpeed = photo:getRawMetadata('shutterSpeed')
-    local isoSpeedRating = photo:getRawMetadata('isoSpeedRating')
-    local fNumber = photo:getRawMetadata('fNumber')
-    local exposureTime = photo:getRawMetadata('exposureTime')
-    local orientation = photo:getRawMetadata('orientation')
-    local iso = photo:getRawMetadata('iso')
-    local isoSpeedRatings = photo:getRawMetadata('isoSpeedRatings')
-    local photographicSensitivity = photo:getRawMetadata('photographicSensitivity')
+    local photoPath = safeGetRawMetadata(photo, 'path') or ''
+    local uuid = safeGetRawMetadata(photo, 'uuid') or string.format("photo_%d_%d", i, os.time())
+    local dateTime = safeGetRawMetadata(photo, 'dateTime')
+
+    -- Aperture may be stored under different keys
+    local aperture = safeGetRawMetadata(photo, 'aperture')
+    local fNumber = safeGetRawMetadata(photo, 'fNumber')
+    if not aperture then
+      aperture = fNumber
+    end
+    if not aperture then
+      aperture = safeGetRawMetadata(photo, 'apertureValue')
+    end
+    if not aperture then
+      Log.warning(string.format("Photo %s: missing aperture metadata (aperture, fNumber, apertureValue)", photoPath))
+    end
+
+    local shutterSpeed = safeGetRawMetadata(photo, 'shutterSpeed')
+    local isoSpeedRating = safeGetRawMetadata(photo, 'isoSpeedRating')
+    local exposureTime = safeGetRawMetadata(photo, 'exposureTime')
+    local orientation = safeGetRawMetadata(photo, 'orientation')
+    local iso = safeGetRawMetadata(photo, 'iso')
+    local isoSpeedRatings = safeGetRawMetadata(photo, 'isoSpeedRatings')
+    local photographicSensitivity = safeGetRawMetadata(photo, 'photographicSensitivity')
     
     -- Build metadata object
     local meta = {
