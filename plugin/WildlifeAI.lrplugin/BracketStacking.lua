@@ -851,18 +851,29 @@ function BracketStacking.createStacks(detectionResults, progressCallback)
           local resolvedPhotos = {}
           for _, photoData in ipairs(bracket.photos) do
             local photo = nil
-            
+
             if photoData.photo then
               -- Simple detection: photo object already available
               photo = photoData.photo
-              Log.debug(string.format("Using direct photo object for position %d", 
+              Log.debug(string.format("Using direct photo object for position %d",
                 photoData.photoIndex or 0))
+
+              -- Verify that the photo object supports stacking
+              if type(photo.addToStack) ~= 'function'
+                and photoData.uuid and photoData.uuid ~= ""
+                and not photoData.uuid:match("^simple_") then
+                Log.debug(string.format(
+                  "Direct photo missing addToStack, retrying with UUID: %s",
+                  photoData.uuid))
+                photo = catalog:findPhotoByUuid(photoData.uuid)
+                if photo then
+                  Log.debug(string.format("Resolved photo by UUID: %s", photoData.uuid))
+                end
+              end
             elseif photoData.uuid and photoData.uuid ~= "" and not photoData.uuid:match("^simple_") then
               -- UUID-based detection: resolve by UUID
               photo = catalog:findPhotoByUuid(photoData.uuid)
               Log.debug(string.format("Resolved photo by UUID: %s", photoData.uuid))
-            else
-              Log.warning(string.format("Invalid photo data: no photo object or valid UUID"))
             end
 
             if photo and type(photo.addToStack) == 'function' then
