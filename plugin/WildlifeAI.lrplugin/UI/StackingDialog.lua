@@ -269,7 +269,7 @@ return function(context, photos)
       local catalog = LrApplication.activeCatalog()
       
       catalog:withWriteAccessDo('Stack Photos', function()
-        -- Collect photo metadata
+        -- Collect photo metadata (photos already provided as parameter)
         local photoData = {}
         
         for i, photo in ipairs(photos) do
