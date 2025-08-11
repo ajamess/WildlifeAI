@@ -308,11 +308,24 @@ end
 -- Detect bracket patterns in time-grouped photos
 local function detectBracketPatterns(photoData, prefs)
   Log.info("=== DETECTING BRACKET PATTERNS ===")
-  if #photoData == 0 then 
+  if #photoData == 0 then
     Log.warning("No photo data provided for bracket detection")
-    return {} 
+    return {}
   end
-  
+
+  -- Convert bracket size preferences to numbers once
+  local minSize = tonumber(prefs.minBracketSize) or 3
+  local maxSize = tonumber(prefs.maxBracketSize) or 9
+
+  local targetSize = prefs.defaultBracketSize
+  if targetSize == 'custom' then
+    targetSize = prefs.customBracketSize or minSize
+  end
+  targetSize = tonumber(targetSize) or minSize
+
+  -- Limit the bracket group size to the smaller of maxSize and targetSize
+  local sizeLimit = math.min(maxSize, targetSize)
+
   local brackets = {}
   local i = 1
   
@@ -333,9 +346,15 @@ local function detectBracketPatterns(photoData, prefs)
       
       if timeDiff <= withinBracketInterval then
         table.insert(bracketGroup, photoData[j])
-        Log.debug(string.format("  Added photo %d to bracket group (group size now: %d)", 
+        Log.debug(string.format("  Added photo %d to bracket group (group size now: %d)",
           j, #bracketGroup))
         j = j + 1
+
+        -- If we've reached the size limit, finalize this bracket
+        if #bracketGroup >= sizeLimit then
+          Log.debug(string.format("  Bracket group reached size limit (%d) - ending bracket group", sizeLimit))
+          break
+        end
       else
         Log.debug(string.format("  Photo %d exceeds time limit - ending bracket group", j))
         break
@@ -343,10 +362,6 @@ local function detectBracketPatterns(photoData, prefs)
     end
     
     -- Analyze this potential bracket group
-    -- Convert bracket size preferences to numbers
-    local minSize = tonumber(prefs.minBracketSize) or 3
-    local maxSize = tonumber(prefs.maxBracketSize) or 9
-    
     if #bracketGroup >= minSize and #bracketGroup <= maxSize then
       
       local exposureAnalysis = analyzeExposurePattern(bracketGroup, prefs)
@@ -356,13 +371,6 @@ local function detectBracketPatterns(photoData, prefs)
       if exposureAnalysis.valid then
         confidence = confidence + 30
       end
-      
-      -- Convert defaultBracketSize to number, handling 'custom' case
-      local targetSize = prefs.defaultBracketSize
-      if targetSize == 'custom' then
-        targetSize = prefs.customBracketSize or 3
-      end
-      targetSize = tonumber(targetSize) or 3
       
       if #bracketGroup == targetSize then
         confidence = confidence + 10
